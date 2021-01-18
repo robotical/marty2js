@@ -1,0 +1,24 @@
+{
+  "name": "marty2js",
+  "version": "1.0.0",
+  "description": "Javascript library for Marty V2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.js",
+  "type": "module",
+  "keywords": [
+    "Marty"
+  ],
+  "author": "Rob Dobson",
+  "license": "Apache 2.0",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "isomorphic-ws": "^4.0.1",
+    "semver": "^7.3.4",
+    "ws": "^7.4.2"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.5",
+    "@types/semver": "^7.3.4",
+    "@types/ws": "^7.4.0"
+  }
+}
