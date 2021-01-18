@@ -1,10 +1,11 @@
 import RICConnMgrWS from "./RICConnMgrWS.js";
 import RICMsgHandler from "./RICMsgHandler.js";
-import { DiscoveredRIC, RICConnEventListener } from "./RICTypes.js";
+import { DiscoveredRIC, RICConnEventFn, RICIFType } from "./RICTypes.js";
 export default class RICConnManager {
     _connMgrWS: RICConnMgrWS | null;
+    _interfaceInUse: RICIFType;
     constructor(msgHandler: RICMsgHandler);
-    onStateChange(listener: RICConnEventListener): void;
+    onStateChange(listener: RICConnEventFn): void;
     connect(discoveredRIC: DiscoveredRIC): Promise<boolean>;
     /**
    * Disconnect from RIC

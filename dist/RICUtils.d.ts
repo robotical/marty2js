@@ -94,4 +94,7 @@ export default class RICUtils {
     static buf2hex(buffer: Uint8Array): string;
     static padStartFn(inStr: string, targetLength: number, padString: string): string;
     static debug(msg: string): void;
+    static info(msg: string): void;
+    static warn(msg: string): void;
+    static error(msg: string): void;
 }

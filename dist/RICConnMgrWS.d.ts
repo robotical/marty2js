@@ -1,13 +1,13 @@
 /// <reference types="ws" />
 import WebSocket from "isomorphic-ws";
 import RICMsgHandler from "./RICMsgHandler.js";
-import { DiscoveredRIC, RICConnEventListener } from "./RICTypes.js";
+import { DiscoveredRIC, RICConnEventFn } from "./RICTypes.js";
 export default class RICConnMgrWS {
     _ricMsgHandler: RICMsgHandler | null;
-    _onStateChangeListener: RICConnEventListener | null;
+    _onStateChangeListener: RICConnEventFn | null;
     _ricToConnectTo: DiscoveredRIC | null;
     _webSocket: WebSocket | null;
-    _isConnected: boolean;
+    _webSocketIsConnected: boolean;
     /**
      * Constructor
      *
@@ -21,7 +21,7 @@ export default class RICConnMgrWS {
      * @param listener: (ifType: RICIFType, stateChangeStr: string, args: RICConnEventArgs | null) => void
      *
      */
-    onStateChange(listener: RICConnEventListener): void;
+    onStateChange(listener: RICConnEventFn): void;
     /**
      * Get WS connection status
      *
@@ -44,7 +44,8 @@ export default class RICConnMgrWS {
     */
     disconnect(): Promise<void>;
     _performDeviceConnection(): Promise<boolean>;
+    webSocketOpen(url: string): Promise<WebSocket>;
     sendTxMsg(msg: Uint8Array, sendWithResponse: boolean): Promise<void>;
     sendTxMsgNoAwait(msg: Uint8Array, sendWithResponse: boolean): Promise<void>;
-    _onMsgRx(msg: Uint8Array | null, error: string | null): void;
+    _onMsgRx(msg: Uint8Array | null): void;
 }

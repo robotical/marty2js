@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // MiniHDLC
@@ -9,25 +8,13 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var __values = (this && this.__values) || function(o) {
-    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-    if (m) return m.call(o);
-    if (o && typeof o.length === "number") return {
-        next: function () {
-            if (o && i >= o.length) o = void 0;
-            return { value: o && o[i++], done: !o };
-        }
-    };
-    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
-};
-Object.defineProperty(exports, "__esModule", { value: true });
 /*eslint no-bitwise: ["error", { "allow": ["&", "<<", ">>", "^"] }] */
 var MiniHDLCState;
 (function (MiniHDLCState) {
     MiniHDLCState[MiniHDLCState["STATE_ESCAPE"] = 0] = "STATE_ESCAPE";
     MiniHDLCState[MiniHDLCState["STATE_READ"] = 1] = "STATE_READ";
 })(MiniHDLCState || (MiniHDLCState = {}));
-var CRC_LUT = [
+const CRC_LUT = [
     0x0000,
     0x1021,
     0x2042,
@@ -285,8 +272,8 @@ var CRC_LUT = [
     0x0ed1,
     0x1ef0,
 ];
-var MiniHDLC = /** @class */ (function () {
-    function MiniHDLC() {
+export default class MiniHDLC {
+    constructor() {
         this.rxBuffer = [];
         this.frameCRC = [];
         this.FRAME_BOUNDARY_OCTET = 0xe7;
@@ -295,14 +282,14 @@ var MiniHDLC = /** @class */ (function () {
         this.rxState = MiniHDLCState.STATE_READ;
         this.onRxFrame = null;
     }
-    MiniHDLC.prototype.addRxByte = function (rxByte) {
+    addRxByte(rxByte) {
         if (rxByte === this.FRAME_BOUNDARY_OCTET) {
             if (this.rxBuffer.length > 2) {
                 this.frameCRC = this.rxBuffer.slice(-2);
                 this.rxBuffer = this.rxBuffer.slice(0, -2);
                 if (this._checkCRC()) {
                     if (this.onRxFrame) {
-                        var rxFrame = new Uint8Array(this.rxBuffer);
+                        const rxFrame = new Uint8Array(this.rxBuffer);
                         this.onRxFrame(rxFrame);
                     }
                 }
@@ -321,62 +308,51 @@ var MiniHDLC = /** @class */ (function () {
                 this.rxBuffer.push(rxByte);
             }
         }
-    };
-    MiniHDLC.prototype.addRxBytes = function (rxBytes) {
-        var e_1, _a;
-        try {
-            for (var rxBytes_1 = __values(rxBytes), rxBytes_1_1 = rxBytes_1.next(); !rxBytes_1_1.done; rxBytes_1_1 = rxBytes_1.next()) {
-                var rxByte = rxBytes_1_1.value;
-                this.addRxByte(rxByte);
-            }
+    }
+    addRxBytes(rxBytes) {
+        for (const rxByte of rxBytes) {
+            this.addRxByte(rxByte);
         }
-        catch (e_1_1) { e_1 = { error: e_1_1 }; }
-        finally {
-            try {
-                if (rxBytes_1_1 && !rxBytes_1_1.done && (_a = rxBytes_1.return)) _a.call(rxBytes_1);
-            }
-            finally { if (e_1) throw e_1.error; }
-        }
-    };
-    MiniHDLC.prototype._checkCRC = function () {
-        var calcCRC = this._crc16(this.rxBuffer);
-        var rxCRC = this.frameCRC[0] * 256 + this.frameCRC[1];
+    }
+    _checkCRC() {
+        const calcCRC = this._crc16(this.rxBuffer);
+        const rxCRC = this.frameCRC[0] * 256 + this.frameCRC[1];
         return calcCRC === rxCRC;
-    };
-    MiniHDLC.prototype._crc16 = function (buf) {
-        var crc = 0xffff;
-        for (var i = 0; i < buf.length; i++) {
-            var byt = buf[i];
+    }
+    _crc16(buf) {
+        let crc = 0xffff;
+        for (let i = 0; i < buf.length; i++) {
+            let byt = buf[i];
             if (byt > 255)
                 byt = 255;
             if (byt < 0)
                 byt = 0;
-            var lutIdx = (byt ^ (crc >> 8)) & 0xff;
+            const lutIdx = (byt ^ (crc >> 8)) & 0xff;
             crc = CRC_LUT[lutIdx] ^ (crc << 8);
         }
         return crc & 0xffff;
-    };
-    MiniHDLC.prototype.encode = function (content) {
-        var maxBufferLen = content.length * 2 + 4;
-        var frameData = new Uint8Array(maxBufferLen);
-        var framePos = 0;
+    }
+    encode(content) {
+        const maxBufferLen = content.length * 2 + 4;
+        const frameData = new Uint8Array(maxBufferLen);
+        let framePos = 0;
         // Prefix
         frameData.set([this.FRAME_BOUNDARY_OCTET], framePos++);
         // Data
-        for (var i = 0; i < content.length; i++) {
+        for (let i = 0; i < content.length; i++) {
             framePos = this._setData(frameData, content[i], framePos);
         }
         // CRC
-        var frameCRC = this._crc16(content);
+        const frameCRC = this._crc16(content);
         framePos = this._setData(frameData, (frameCRC >> 8) & 0xff, framePos);
         framePos = this._setData(frameData, frameCRC & 0xff, framePos);
         // Suffix
         frameData.set([this.FRAME_BOUNDARY_OCTET], framePos++);
         // Frame of correct length
-        var frameFinal = frameData.slice(0, framePos);
+        const frameFinal = frameData.slice(0, framePos);
         return frameFinal;
-    };
-    MiniHDLC.prototype._setData = function (destBuf, dataVal, pos) {
+    }
+    _setData(destBuf, dataVal, pos) {
         if (dataVal === this.FRAME_BOUNDARY_OCTET ||
             dataVal === this.CONTROL_ESCAPE_OCTET) {
             destBuf.set([this.CONTROL_ESCAPE_OCTET, dataVal ^ this.INVERT_OCTET], pos);
@@ -387,7 +363,5 @@ var MiniHDLC = /** @class */ (function () {
             pos += 1;
         }
         return pos;
-    };
-    return MiniHDLC;
-}());
-exports.default = MiniHDLC;
+    }
+}

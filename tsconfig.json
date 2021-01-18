@@ -1,13 +1,13 @@
 {
     "compilerOptions": {
       "esModuleInterop": true,
-      "lib": ["es6","dom"],
-      "module": "CommonJS", 
+      "lib": [],
+      "module": "ESNext", 
       "outDir": "./dist",
       "declaration": true,
       "rootDir": "./src",
       "strict": true,
-      "target": "ES5",
+      "target": "ES6",
       "noImplicitAny": true,
       "noUnusedLocals": true,
       "noUnusedParameters": true,

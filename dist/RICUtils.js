@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // RICConnUtils
@@ -9,10 +8,7 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-Object.defineProperty(exports, "__esModule", { value: true });
-var RICUtils = /** @class */ (function () {
-    function RICUtils() {
-    }
+export default class RICUtils {
     /**
      *
      * Add a string to a Uint8Array buffer
@@ -21,21 +17,21 @@ var RICUtils = /** @class */ (function () {
      * @param strToAdd - string to be added
      * @param startPos - start position in buffer (i.e. offset to place string at)
      */
-    RICUtils.addStringToBuffer = function (buffer, strToAdd, startPos) {
+    static addStringToBuffer(buffer, strToAdd, startPos) {
         // Check valid
         if (buffer.length < startPos + strToAdd.length + 1) {
             RICUtils.debug('addStringToBuffer buffer too short');
             return;
         }
-        var curPos = startPos;
-        for (var i = 0; i < strToAdd.length; i++) {
-            var charAt = strToAdd.charCodeAt(i);
+        let curPos = startPos;
+        for (let i = 0; i < strToAdd.length; i++) {
+            let charAt = strToAdd.charCodeAt(i);
             if (charAt > 255)
                 charAt = 255;
             buffer.set([charAt], curPos++);
         }
         buffer.set([0], buffer.length - 1);
-    };
+    }
     /**
      *
      * Get a string from a Uint8Array buffer
@@ -45,31 +41,31 @@ var RICUtils = /** @class */ (function () {
      * @param strLen - length of string to get
      * @returns strGot - string got from buffer
      */
-    RICUtils.getStringFromBuffer = function (buffer, startPos, strLen) {
+    static getStringFromBuffer(buffer, startPos, strLen) {
         // Check valid
         if (buffer.length < startPos + strLen) {
             strLen = buffer.length - startPos;
             if (strLen <= 0)
                 return '';
         }
-        var curPos = startPos;
-        var outStr = '';
-        for (var i = 0; i < strLen; i++) {
+        let curPos = startPos;
+        let outStr = '';
+        for (let i = 0; i < strLen; i++) {
             outStr += String.fromCharCode(buffer[curPos++]);
         }
         return outStr;
-    };
+    }
     /**
      *
      * Debug code to format a Uint8Array to string for logging
      *
      * @param buffer - Uint8Array to be converted to hex string
      */
-    RICUtils.bufferToHex = function (buffer) {
+    static bufferToHex(buffer) {
         return Array.from(new Uint8Array(buffer))
-            .map(function (b) { return RICUtils.padStartFn(b.toString(16), 2, '0'); })
+            .map(b => RICUtils.padStartFn(b.toString(16), 2, '0'))
             .join('');
-    };
+    }
     /**
      *
      * Extract a big-endian float from a uint8array
@@ -77,20 +73,20 @@ var RICUtils = /** @class */ (function () {
      * @param buf - Uint8Array containing float
      * @returns float
      */
-    RICUtils.getBEFloatFromBuf = function (buf) {
-        var revBuf = new Uint8Array(4);
+    static getBEFloatFromBuf(buf) {
+        const revBuf = new Uint8Array(4);
         if (RICUtils.isLittleEndian()) {
-            for (var i = 0; i < 4; i++)
+            for (let i = 0; i < 4; i++)
                 revBuf[3 - i] = buf[i];
         }
         else {
-            for (var i = 0; i < 4; i++)
+            for (let i = 0; i < 4; i++)
                 revBuf[i] = buf[i];
         }
-        var floatVal = new Float32Array(revBuf.buffer);
+        const floatVal = new Float32Array(revBuf.buffer);
         // RICUtils.debug('revFloat ' + RICUtils.bufferToHex(revBuf) + floatVal[0]);
         return floatVal[0];
-    };
+    }
     /**
      *
      * Extract a big-endian int16 from a uint8array
@@ -99,14 +95,14 @@ var RICUtils = /** @class */ (function () {
      * @param pos - position (offset in buf) to get from
      * @returns int16
      */
-    RICUtils.getBEInt16FromBuf = function (buf, bufPos) {
+    static getBEInt16FromBuf(buf, bufPos) {
         if (RICUtils.isLittleEndian()) {
-            var val_1 = buf[bufPos] * 256 + buf[bufPos + 1];
-            return val_1 > 32767 ? val_1 - 65536 : val_1;
+            const val = buf[bufPos] * 256 + buf[bufPos + 1];
+            return val > 32767 ? val - 65536 : val;
         }
-        var val = buf[bufPos + 1] * 256 + buf[bufPos];
+        const val = buf[bufPos + 1] * 256 + buf[bufPos];
         return val > 32767 ? val - 65536 : val;
-    };
+    }
     /**
      *
      * Extract a big-endian uint16 from a uint8array
@@ -115,11 +111,11 @@ var RICUtils = /** @class */ (function () {
      * @param pos - position (offset in buf) to get from
      * @returns int16
      */
-    RICUtils.getBEUint16FromBuf = function (buf, bufPos) {
+    static getBEUint16FromBuf(buf, bufPos) {
         if (RICUtils.isLittleEndian())
             return buf[bufPos] * 256 + buf[bufPos + 1];
         return buf[bufPos + 1] * 256 + buf[bufPos];
-    };
+    }
     /**
      *
      * Extract a big-endian uint8 from a uint8array
@@ -128,16 +124,16 @@ var RICUtils = /** @class */ (function () {
      * @param pos - position (offset in buf) to get from
      * @returns int16
      */
-    RICUtils.getBEUint8FromBuf = function (buf, pos) {
+    static getBEUint8FromBuf(buf, pos) {
         return buf[pos];
-    };
-    RICUtils.isLittleEndian = function () {
+    }
+    static isLittleEndian() {
         // If already known just return
         if (this._isEndianSet)
             return this._isLittleEndian;
         // Figure out endian-ness
-        var a = new Uint32Array([0x12345678]);
-        var b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+        const a = new Uint32Array([0x12345678]);
+        const b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
         this._isEndianSet = true;
         this._isLittleEndian = b[0] != 0x12;
         return this._isLittleEndian;
@@ -148,7 +144,7 @@ var RICUtils = /** @class */ (function () {
         // buf[1] = 0;
         // RICUtils.debug("Resulting short " + shView[0]);
         // return shView[0] == 1;
-    };
+    }
     // The following code from https://github.com/jsdom/abab
     /**
      * Implementation of atob() according to the HTML and Infra specs, except that
@@ -158,10 +154,10 @@ var RICUtils = /** @class */ (function () {
      * @returns Uint8Array
      *
      */
-    RICUtils.atob = function (data) {
+    static atob(data) {
         // Web IDL requires DOMStrings to just be converted using ECMAScript
         // ToString, which in our case amounts to using a template literal.
-        data = "" + data;
+        data = `${data}`;
         // "Remove all ASCII whitespace from data."
         data = data.replace(/[ \t\n\f\r]/g, '');
         // "If data's length divides by 4 leaving no remainder, then: if data ends
@@ -183,19 +179,19 @@ var RICUtils = /** @class */ (function () {
             return null;
         }
         // "Let output be an empty byte sequence."
-        var output = new Uint8Array((data.length * 3) / 4 + 1);
+        const output = new Uint8Array((data.length * 3) / 4 + 1);
         // "Let buffer be an empty buffer that can have bits appended to it."
         //
         // We append bits via left-shift and or.  accumulatedBits is used to track
         // when we've gotten to 24 bits.
-        var buffer = 0;
-        var accumulatedBits = 0;
+        let buffer = 0;
+        let accumulatedBits = 0;
         // "Let position be a position variable for data, initially pointing at the
         // start of data."
         //
         // "While position does not point past the end of data:"
-        var bytePos = 0;
-        for (var i = 0; i < data.length; i++) {
+        let bytePos = 0;
+        for (let i = 0; i < data.length; i++) {
             // "Find the code point pointed to by position in the second column of
             // Table 1: The Base 64 Alphabet of RFC 4648. Let n be the number given in
             // the first cell of the same row.
@@ -205,7 +201,7 @@ var RICUtils = /** @class */ (function () {
             //
             // atobLookup() implements the table from RFC 4648.
             buffer <<= 6;
-            var atobVal = RICUtils.atobLookup(data[i]);
+            const atobVal = RICUtils.atobLookup(data[i]);
             if (atobVal !== undefined) {
                 buffer |= atobVal;
             }
@@ -238,12 +234,12 @@ var RICUtils = /** @class */ (function () {
         }
         // "Return output."
         return output.slice(0, bytePos);
-    };
+    }
     /**
      * A lookup table for atob(), which converts an ASCII character to the
      * corresponding six-bit number.
      */
-    RICUtils.atobLookup = function (chr) {
+    static atobLookup(chr) {
         if (/[A-Z]/.test(chr)) {
             return chr.charCodeAt(0) - 'A'.charCodeAt(0);
         }
@@ -261,7 +257,7 @@ var RICUtils = /** @class */ (function () {
         }
         // Throw exception; should not be hit in tests
         return undefined;
-    };
+    }
     /**
      * btoa() as defined by the HTML and Infra specs, which mostly just references
      * RFC 4648.
@@ -270,8 +266,8 @@ var RICUtils = /** @class */ (function () {
      * @returns string containing base64 representation
      *
      */
-    RICUtils.btoa = function (inBuf) {
-        var i;
+    static btoa(inBuf) {
+        let i;
         // String conversion as required by Web IDL.
         // s = `${s}`;
         // "The btoa() method must throw an "InvalidCharacterError" DOMException if
@@ -281,9 +277,9 @@ var RICUtils = /** @class */ (function () {
         //     return null;
         //   }
         // }
-        var out = '';
+        let out = '';
         for (i = 0; i < inBuf.length; i += 3) {
-            var groupsOfSix = [
+            const groupsOfSix = [
                 undefined,
                 undefined,
                 undefined,
@@ -299,7 +295,7 @@ var RICUtils = /** @class */ (function () {
                     groupsOfSix[3] = inBuf[i + 2] & 0x3f;
                 }
             }
-            for (var j = 0; j < groupsOfSix.length; j++) {
+            for (let j = 0; j < groupsOfSix.length; j++) {
                 if (typeof groupsOfSix[j] === 'undefined') {
                     out += '=';
                 }
@@ -309,12 +305,12 @@ var RICUtils = /** @class */ (function () {
             }
         }
         return out;
-    };
+    }
     /**
      * Lookup table for btoa(), which converts a six-bit number into the
      * corresponding ASCII character.
      */
-    RICUtils.btoaLookup = function (idx) {
+    static btoaLookup(idx) {
         if (idx === undefined) {
             return undefined;
         }
@@ -335,13 +331,13 @@ var RICUtils = /** @class */ (function () {
         }
         // Throw INVALID_CHARACTER_ERR exception here -- won't be hit in the tests.
         return undefined;
-    };
-    RICUtils.buf2hex = function (buffer) {
+    }
+    static buf2hex(buffer) {
         return Array.prototype.map
-            .call(buffer, function (x) { return ('00' + x.toString(16)).slice(-2); })
+            .call(buffer, x => ('00' + x.toString(16)).slice(-2))
             .join('');
-    };
-    RICUtils.padStartFn = function (inStr, targetLength, padString) {
+    }
+    static padStartFn(inStr, targetLength, padString) {
         targetLength = targetLength >> 0; //truncate if number or convert non-number to 0;
         padString = String((typeof padString !== 'undefined' ? padString : ' '));
         if (inStr.length > targetLength) {
@@ -354,12 +350,20 @@ var RICUtils = /** @class */ (function () {
             }
             return padString.slice(0, targetLength) + String(inStr);
         }
-    };
-    RICUtils.debug = function (msg) {
-        console.log(msg);
-    };
-    RICUtils._isEndianSet = false;
-    RICUtils._isLittleEndian = false;
-    return RICUtils;
-}());
-exports.default = RICUtils;
+    }
+    static debug(msg) {
+        if (msg) { }
+        // console.debug(msg);
+    }
+    static info(msg) {
+        console.info(msg);
+    }
+    static warn(msg) {
+        console.warn(msg);
+    }
+    static error(msg) {
+        console.error(msg);
+    }
+}
+RICUtils._isEndianSet = false;
+RICUtils._isLittleEndian = false;

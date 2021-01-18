@@ -38,12 +38,11 @@ import {
     RICHWElemList,
     RICAddOnList,
     RICHWElem,
-    RICSubscription,
-    RICConnEventListener,
     RICConnEventArgs,
     RICEvent,
     RICCmdParams,
     RICFetchBlobFnType,
+    RICEventIF,
 } from './RICTypes.js';
 import RICUtils from './RICUtils.js';
 
@@ -56,7 +55,7 @@ import RICUtils from './RICUtils.js';
 export class Marty {
 
     // Event callbakcs
-    _connEventListener: RICConnEventListener | null = null;
+    _ricEventListener: RICEventIF | null = null;
 
     // System info
     _systemInfo: RICSystemInfo | null = null;
@@ -82,12 +81,7 @@ export class Marty {
     // Listener for state changes
     _discoveryListener: RICDiscoveryListener | null = null;
 
-    // Connection
-    _connSubscrOnRx: RICSubscription | null = null;
-    _connSubscrOnDisconnect: RICSubscription | null = null;
-    _connSubscrOnStateChange: RICSubscription | null = null;
-
-    // Progress bar
+    // Progress bar constants
     _progressAfterDownload = 0.1;
     _progressAfterUpload = 0.9;
     _progressAfterRestart = 0.93;
@@ -130,6 +124,9 @@ export class Marty {
         Eyes: 'Eyes',
     };
 
+    // Subscription rate
+    _subscribeRateHz = 10;
+
     // FW update
     FW_UPDATE_CHECKS_BEFORE_ASSUME_FAILED = 10;
     FIRMWARE_TYPE_FOR_MAIN_ESP32_FW = 'main';
@@ -145,7 +142,7 @@ export class Marty {
     // Mark: Constructor ---------------------------------------------------------------------------------------
 
     constructor() {
-        // RICUtils.debug('Starting up');
+        // RICUtils.info('Marty connector starting up');
 
         // Subscribe to connection state changes
         this._connManager.onStateChange((connEvent, connEventArgs) => {
@@ -158,12 +155,12 @@ export class Marty {
         this._ricFileHandler.registerMsgSender(this._connManager);
     }
 
-    // Callback for connection events
-    setConnEventListener(listener: RICConnEventListener): void {
-        this._connEventListener = listener;
+    // Callback for RIC events including data
+    setEventListener(listener: RICEventIF): void {
+        this._ricEventListener = listener;
     }
-    removeConnEventListener(): void {
-        this._connEventListener = null;
+    removeEventListener(): void {
+        this._ricEventListener = null;
     }
 
     // Set a callback to handle "fetch-blob" requests
@@ -211,7 +208,7 @@ export class Marty {
                 true,
             );
         } catch (error) {
-            RICUtils.debug('robotControl failed ' + error.toString());
+            RICUtils.warn('robotControl failed ' + error.toString());
             return new RICOKFail();
         }
     }
@@ -232,7 +229,7 @@ export class Marty {
                 true,
             );
         } catch (error) {
-           RICUtils.debug('powerControl failed ' + error.toString());
+           RICUtils.warn('powerControl failed ' + error.toString());
             return new RICOKFail();
         }
     }
@@ -254,7 +251,7 @@ export class Marty {
                 true,
             );
         } catch (error) {
-           RICUtils.debug('fileRun failed ' + error.toString());
+           RICUtils.warn('fileRun failed ' + error.toString());
             return new RICOKFail();
         }
     }
@@ -323,7 +320,7 @@ export class Marty {
            RICUtils.debug('getRICSystemInfo returned ' + ricSystemInfo);
             return ricSystemInfo;
         } catch (error) {
-           RICUtils.debug('getRICSystemInfo Failed to get version' + error.toString());
+           RICUtils.warn('getRICSystemInfo Failed to get version' + error.toString());
             return new RICSystemInfo();
         }
     }
@@ -344,8 +341,41 @@ export class Marty {
            RICUtils.debug('getRICCalibInfo returned ' + ricCalibInfo);
             return ricCalibInfo;
         } catch (error) {
-           RICUtils.debug('getRICCalibInfo Failed to get version' + error.toString());
+           RICUtils.warn('getRICCalibInfo Failed to get version' + error.toString());
             return new RICCalibInfo();
+        }
+    }
+
+    // Mark: RIC Subscription to Updates --------------------------------------------------------------------------------
+
+    /**
+     *
+     * subscribeForUpdates
+     * @param enable - true to send command to enable subscription (false to remove sub)
+     * @returns Promise<void>
+     *
+     */
+    async subscribeForUpdates(enable: boolean): Promise<void> {
+        try {
+            const subscribeDisable = '{"cmdName":"subscription","action":"update",' +
+                    '"pubRecs":[' + 
+                        `{"name":"MultiStatus","rateHz":0,}` + 
+                        '{"name":"PowerStatus","rateHz":0},' + 
+                        `{"name":"AddOnStatus","rateHz":0}` + 
+                    ']}';
+            const subscribeEnable = '{"cmdName":"subscription","action":"update",' +
+                    '"pubRecs":[' + 
+                        `{"name":"MultiStatus","rateHz":${this._subscribeRateHz.toString()}}` + 
+                        `{"name":"PowerStatus","rateHz":1.0},` + 
+                        `{"name":"AddOnStatus","rateHz":${this._subscribeRateHz.toString()}}` + 
+                    ']}';
+
+            const ricResp = await this._ricMsgHandler.sendRICRESTCmdFrame<
+                RICOKFail
+            >(enable ? subscribeEnable : subscribeDisable, true);
+           RICUtils.debug(`subscribe enable/disable returned ${JSON.stringify(ricResp)}`);
+        } catch (error) {
+           RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
         }
     }
 
@@ -373,7 +403,7 @@ export class Marty {
             if (paramQueryStr.length > 0) cmdUrl += '?' + paramQueryStr;
             return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(cmdUrl, true);
         } catch (error) {
-           RICUtils.debug('runTrajectory failed' + error.toString());
+           RICUtils.warn('runTrajectory failed' + error.toString());
             return new RICOKFail();
         }
     }
@@ -404,7 +434,7 @@ export class Marty {
                 true,
             );
         } catch (error) {
-           RICUtils.debug('runCommand failed' + error.toString());
+           RICUtils.warn('runCommand failed' + error.toString());
             return new RICOKFail();
         }
     }
@@ -424,7 +454,7 @@ export class Marty {
                 true,
             );
         } catch (error) {
-           RICUtils.debug('hwElemFirmwareUpdate get status failed' + error.toString());
+           RICUtils.warn('hwElemFirmwareUpdate get status failed' + error.toString());
             return new RICOKFail();
         }
     }
@@ -448,7 +478,7 @@ export class Marty {
             this._addOnManager.setHWElems(this._hwElems);
             return ricHWList;
         } catch (error) {
-            RICUtils.debug('getHWElemList Failed to get list of HWElems' + error.toString());
+            RICUtils.warn('getHWElemList Failed to get list of HWElems' + error.toString());
             return new RICHWElemList();
         }
     }
@@ -492,7 +522,7 @@ export class Marty {
             RICUtils.debug('getAddOnList returned ' + addOnList);
             return addOnList;
         } catch (error) {
-            RICUtils.debug('getAddOnList Failed to get list of add-ons' + error.toString());
+            RICUtils.warn('getAddOnList Failed to get list of add-ons' + error.toString());
             return new RICAddOnList();
         }
     }
@@ -514,7 +544,7 @@ export class Marty {
             RICUtils.debug('getFileList returned ' + ricFileList);
             return ricFileList;
         } catch (error) {
-            RICUtils.debug('getFileList Failed to get file list' + error.toString());
+            RICUtils.warn('getFileList Failed to get file list' + error.toString());
             return new RICFileList();
         }
     }
@@ -584,7 +614,7 @@ export class Marty {
                     );
                     if (rslt.rslt != 'ok') overallResult = false;
                 } catch (error) {
-                    RICUtils.debug(`calibrate failed on joint ${jnt}` + error.toString());
+                    RICUtils.warn(`calibrate failed on joint ${jnt}` + error.toString());
                 }
 
                 // Wait as writing to flash blocks servo access
@@ -603,12 +633,12 @@ export class Marty {
                     );
                     if (rslt.rslt != 'ok') overallResult = false;
                 } catch (error) {
-                    RICUtils.debug(`enable failed on joint ${jnt}` + error.toString());
+                    RICUtils.warn(`enable failed on joint ${jnt}` + error.toString());
                 }
             }
 
             // Result
-            RICUtils.debug('Set calibration flag to true');
+            RICUtils.info('Set calibration flag to true');
             this._reportConnEvent(RICEvent.SET_CALIBRATION_FLAG);
             const rslt = new RICOKFail();
             rslt.set(overallResult);
@@ -648,7 +678,7 @@ export class Marty {
             );
             this._lastestVersionInfo = response.data;
         } catch (error) {
-            RICUtils.debug('checkForUpdate failed to get latest from internet');
+            RICUtils.warn('checkForUpdate failed to get latest from internet');
             this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
         }
         if (this._lastestVersionInfo === null) return;
@@ -661,7 +691,7 @@ export class Marty {
                 `checkForUpdate RIC Version ${this._systemInfo.SystemVersion}`,
             );
         } catch (error) {
-            RICUtils.debug('checkForUpdate - failed to get version ' + error);
+            RICUtils.warn('checkForUpdate - failed to get version ' + error);
             return;
         }
 
@@ -682,7 +712,7 @@ export class Marty {
                 this._reportConnEvent(RICEvent.UPDATE_NOT_AVAILABLE);
             }
         } catch (error) {
-            RICUtils.debug('Failed to get latest version from internet');
+            RICUtils.warn('Failed to get latest version from internet');
             this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
             return;
         }
@@ -733,7 +763,7 @@ export class Marty {
                     this._updateElemsRequired = true;
                 }
             } catch (error) {
-                RICUtils.debug(
+                RICUtils.warn(
                     'isUpdateRequired failed to get hw-elem firmware update status',
                 );
             }
@@ -826,7 +856,7 @@ export class Marty {
                 }
             }
         } catch (error) {
-            RICUtils.debug(error);
+            RICUtils.warn(error);
             this._reportConnEvent(RICEvent.UPDATE_FAILED + error.toString());
             return;
         }
@@ -886,7 +916,7 @@ export class Marty {
                 sentBytes += firmwareData[fwIdx].length;
             }
         } catch (error) {
-            RICUtils.debug(error);
+            RICUtils.warn(error);
             this._reportConnEvent(RICEvent.UPDATE_FAILED);
             return;
         }
@@ -942,7 +972,7 @@ export class Marty {
                     }
                     break;
                 } catch (error) {
-                    RICUtils.debug(
+                    RICUtils.warn(
                         'fwUpdate - failed to get version attempt ' +
                         fwUpdateCheckCount.toString() + 'error' + error.toString()
                     );
@@ -981,7 +1011,7 @@ export class Marty {
             try {
                 await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(updateCmd, true);
             } catch (error) {
-                RICUtils.debug('failed to start hw-elem firmware update cmd ' + updateCmd);
+                RICUtils.warn('failed to start hw-elem firmware update cmd ' + updateCmd);
 
                 // Continue with other firmwares
                 continue;
@@ -1019,7 +1049,7 @@ export class Marty {
                         break;
                     }
                 } catch (error) {
-                    RICUtils.debug('failed to get hw-elem firmware update status');
+                    RICUtils.warn('failed to get hw-elem firmware update status');
                 }
             }
         }
@@ -1059,36 +1089,45 @@ export class Marty {
             this._ricFriendlyName = null;
             this._ricFriendlyNameIsSet = false;
             RICUtils.debug('Disconnected ' + connEventArgs?.name);
+            this._reportConnEvent(connEvent, connEventArgs);
         } else if (connEvent === RICEvent.CONNECTED_RIC) {
+            this._reportConnEvent(RICEvent.CONNECTED_TRANSPORT_LAYER, connEventArgs);
             // Get system info
             try {
                 this._systemInfo = await this.getRICSystemInfo();
                 RICUtils.debug(
-                    `verificationStop - RIC Version ${this._systemInfo.SystemVersion}`,
+                    `eventConnect - RIC Version ${this._systemInfo.SystemVersion}`,
                 );
             } catch (error) {
-                RICUtils.debug('verificationStop - failed to get version ' + error);
+                RICUtils.warn('eventConnect - failed to get version ' + error);
             }
 
             // Get RIC name
             try {
                 await this.getRICName();
             } catch (error) {
-                RICUtils.debug('verificationStop - failed to get RIC name ' + error);
+                RICUtils.warn('eventConnect - failed to get RIC name ' + error);
             }
 
             // Get calibration info
             try {
                 this._calibInfo = await this.getRICCalibInfo();
             } catch (error) {
-                RICUtils.debug('verificationStop - failed to get calib info ' + error);
+                RICUtils.warn('eventConnect - failed to get calib info ' + error);
             }
 
             // Get HWElems (connected to RIC)
             try {
                 await this.getHWElemList();
             } catch (error) {
-                RICUtils.debug('verificationStop - failed to get HWElems ' + error);
+                RICUtils.warn('eventConnect - failed to get HWElems ' + error);
+            }
+
+            // Subscribe for updates
+            try {
+                await this.subscribeForUpdates(true);
+            } catch (error) {
+                RICUtils.warn(`eventConnect - subscribe for updates failed ${error.toString()}`)
             }
 
             // RIC verified and connected
@@ -1105,7 +1144,10 @@ export class Marty {
 
             // Debug
             RICUtils.debug('Connected ' + connEventArgs?.name);
+        } else {
+            this._reportConnEvent(connEvent, connEventArgs);
         }
+
     }
 
     // Mark: Message handling -----------------------------------------------------------------------------------------
@@ -1147,31 +1189,38 @@ export class Marty {
         // RICUtils.debug(`onRxSmartServo ${ JSON.stringify(smartServos) } `);
         this._ricStateInfo.smartServos = smartServos;
         this._ricStateInfo.smartServosValidMs = Date.now();
+        this._ricEventListener?.onRxSmartServo(smartServos);
     }
 
     onRxIMU(imuData: ROSSerialIMU): void {
         // RICUtils.debug(`onRxIMU ${ JSON.stringify(imuData) } `);
         this._ricStateInfo.imuData = imuData;
         this._ricStateInfo.imuDataValidMs = Date.now();
+        this._ricEventListener?.onRxIMU(imuData);
     }
 
     onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void {
         // RICUtils.debug(`onRxPowerStatus ${ JSON.stringify(powerStatus) } `);
         this._ricStateInfo.power = powerStatus;
         this._ricStateInfo.powerValidMs = Date.now();
+        this._ricEventListener?.onRxPowerStatus(powerStatus);
     }
 
     onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void {
         // RICUtils.debug(`onRxAddOnPub ${ JSON.stringify(addOnInfo) } `);
         this._ricStateInfo.addOnInfo = addOnInfo;
         this._ricStateInfo.addOnInfoValidMs = Date.now();
+        this._ricEventListener?.onRxAddOnPub(addOnInfo);
     }
 
     getRICStateInfo(): RICStateInfo {
         return this._ricStateInfo;
     }
 
-    _objectEntries(obj: RICCmdParams): Array<Array<string | number>> {
+    _objectEntries(obj: RICCmdParams | undefined): Array<Array<string | number>> {
+        if (!obj) {
+            return [];
+        }
         var ownProps = Object.keys(obj),
             i = ownProps.length,
             resArray = new Array(i); // preallocate the Array
@@ -1181,8 +1230,6 @@ export class Marty {
     };
 
     _reportConnEvent(connEvent: RICEvent, connEventArgs?: RICConnEventArgs): void {
-
-        if (this._connEventListener)
-            this._connEventListener(connEvent, connEventArgs);
+        this._ricEventListener?.onConnEvent(connEvent, connEventArgs);
     }
 }

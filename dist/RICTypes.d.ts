@@ -12,12 +12,13 @@ export declare class DiscoveredRIC {
     _name: string;
     _id: string;
     _rssi: number;
-    _url: string;
-    constructor(localName: string, name: string, id: string, rssi: number, url: string);
+    _hostnameOrIPAddress: string;
+    _interface: RICIFType;
+    constructor(localNameOrIPAddress: string, name: string, id?: string, rssi?: number);
     get name(): string;
     get id(): string;
     get rssi(): number;
-    get url(): string;
+    get ipAddress(): string;
 }
 export declare enum DiscoveryInterfaces {
     DISCOVER_ANY = 0,
@@ -161,7 +162,7 @@ export interface Dictionary<T> {
     [key: string]: T;
 }
 export declare type RICConnEventArgs = {
-    url?: string;
+    ipAddress?: string;
     name?: string;
     ifType?: RICIFType;
     systemInfo?: RICSystemInfo;
@@ -172,23 +173,23 @@ export declare type RICConnEventArgs = {
 export declare enum RICEvent {
     CONNECTING_RIC = 0,
     CONNECTING_RIC_FAIL = 1,
-    CONNECTED_RIC = 2,
-    DISCONNECTED_RIC = 3,
-    SET_RIC_NAME_START = 4,
-    SET_RIC_NAME_SUCCESS = 5,
-    SET_RIC_NAME_FAILED = 6,
-    SET_CALIBRATION_FLAG = 7,
-    UPDATE_CANT_REACH_SERVER = 8,
-    UPDATE_IS_AVAILABLE = 9,
-    UPDATE_NOT_AVAILABLE = 10,
-    UPDATE_STARTED = 11,
-    UPDATE_PROGRESS = 12,
-    UPDATE_FAILED = 13,
-    UPDATE_SUCCESS_ALL = 14,
-    UPDATE_SUCCESS_MAIN_ONLY = 15,
-    UPDATE_CANCELLING = 16
+    CONNECTED_TRANSPORT_LAYER = 2,
+    CONNECTED_RIC = 3,
+    DISCONNECTED_RIC = 4,
+    SET_RIC_NAME_START = 5,
+    SET_RIC_NAME_SUCCESS = 6,
+    SET_RIC_NAME_FAILED = 7,
+    SET_CALIBRATION_FLAG = 8,
+    UPDATE_CANT_REACH_SERVER = 9,
+    UPDATE_IS_AVAILABLE = 10,
+    UPDATE_NOT_AVAILABLE = 11,
+    UPDATE_STARTED = 12,
+    UPDATE_PROGRESS = 13,
+    UPDATE_FAILED = 14,
+    UPDATE_SUCCESS_ALL = 15,
+    UPDATE_SUCCESS_MAIN_ONLY = 16,
+    UPDATE_CANCELLING = 17
 }
-export declare type RICConnEventListener = (eventType: RICEvent, args?: RICConnEventArgs) => void;
 export declare type RICCmdParams = {
     [key: string]: number;
 };
@@ -197,3 +198,11 @@ export declare type RICFetchBlobResult = {
     flush: () => void;
 };
 export declare type RICFetchBlobFnType = (config: Object, httpType: string, filePath: string, progressCB: (received: number, total: number) => void) => RICFetchBlobResult | null;
+export declare type RICConnEventFn = (eventType: RICEvent, args?: RICConnEventArgs) => void;
+export interface RICEventIF {
+    onRxSmartServo(smartServos: ROSSerialSmartServos): void;
+    onRxIMU(imuData: ROSSerialIMU): void;
+    onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void;
+    onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
+    onConnEvent: RICConnEventFn;
+}

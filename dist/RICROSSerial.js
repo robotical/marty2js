@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // RICROSSerial
@@ -9,27 +8,19 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var RICUtils_js_1 = __importDefault(require("./RICUtils.js"));
-var ROSSerialSmartServos = /** @class */ (function () {
-    function ROSSerialSmartServos() {
+import RICUtils from './RICUtils.js';
+export class ROSSerialSmartServos {
+    constructor() {
         this.smartServos = [];
     }
-    return ROSSerialSmartServos;
-}());
-exports.ROSSerialSmartServos = ROSSerialSmartServos;
-var ROSSerialIMU = /** @class */ (function () {
-    function ROSSerialIMU() {
+}
+export class ROSSerialIMU {
+    constructor() {
         this.accel = { x: 0, y: 0, z: 0 };
     }
-    return ROSSerialIMU;
-}());
-exports.ROSSerialIMU = ROSSerialIMU;
-var ROSSerialPowerStatus = /** @class */ (function () {
-    function ROSSerialPowerStatus() {
+}
+export class ROSSerialPowerStatus {
+    constructor() {
         this.powerStatus = {
             battRemainCapacityPercent: 0,
             battTempDegC: 0,
@@ -41,56 +32,48 @@ var ROSSerialPowerStatus = /** @class */ (function () {
             powerUSBIsConnected: false,
         };
     }
-    return ROSSerialPowerStatus;
-}());
-exports.ROSSerialPowerStatus = ROSSerialPowerStatus;
-var ROSSerialAddOnStatus = /** @class */ (function () {
-    function ROSSerialAddOnStatus() {
+}
+export class ROSSerialAddOnStatus {
+    constructor() {
         this.id = 0;
         this.deviceTypeID = 0;
         this.name = '';
         this.status = 0;
         this.vals = {};
     }
-    return ROSSerialAddOnStatus;
-}());
-exports.ROSSerialAddOnStatus = ROSSerialAddOnStatus;
-var ROSSerialAddOnStatusList = /** @class */ (function () {
-    function ROSSerialAddOnStatusList() {
+}
+export class ROSSerialAddOnStatusList {
+    constructor() {
         this.addons = new Array();
     }
-    return ROSSerialAddOnStatusList;
-}());
-exports.ROSSerialAddOnStatusList = ROSSerialAddOnStatusList;
-var RICROSSerial = /** @class */ (function () {
-    function RICROSSerial() {
-    }
-    RICROSSerial.decode = function (rosSerialMsg, startPos, messageResult, commsStats, addOnManager) {
+}
+export default class RICROSSerial {
+    static decode(rosSerialMsg, startPos, messageResult, commsStats, addOnManager) {
         // Payload may contain multiple ROSSerial messages
-        var msgPos = startPos;
+        let msgPos = startPos;
         while (true) {
-            var remainingMsgLen = rosSerialMsg.length - msgPos;
+            const remainingMsgLen = rosSerialMsg.length - msgPos;
             // ROSSerial ROSTopics
-            var ROSTOPIC_V2_SMART_SERVOS = 120;
-            var ROSTOPIC_V2_ACCEL = 121;
-            var ROSTOPIC_V2_POWER_STATUS = 122;
-            var ROSTOPIC_V2_ADDONS = 123;
+            const ROSTOPIC_V2_SMART_SERVOS = 120;
+            const ROSTOPIC_V2_ACCEL = 121;
+            const ROSTOPIC_V2_POWER_STATUS = 122;
+            const ROSTOPIC_V2_ADDONS = 123;
             // ROSSerial message format
-            var RS_MSG_MIN_LENGTH = 8;
-            var RS_MSG_LEN_LOW_POS = 2;
-            var RS_MSG_LEN_HIGH_POS = 3;
-            var RS_MSG_TOPIC_ID_LOW_POS = 5;
-            var RS_MSG_TOPIC_ID_HIGH_POS = 6;
-            var RS_MSG_PAYLOAD_POS = 7;
+            const RS_MSG_MIN_LENGTH = 8;
+            const RS_MSG_LEN_LOW_POS = 2;
+            const RS_MSG_LEN_HIGH_POS = 3;
+            const RS_MSG_TOPIC_ID_LOW_POS = 5;
+            const RS_MSG_TOPIC_ID_HIGH_POS = 6;
+            const RS_MSG_PAYLOAD_POS = 7;
             // Max payload length
-            var MAX_VALID_PAYLOAD_LEN = 1000;
+            const MAX_VALID_PAYLOAD_LEN = 1000;
             // RICUtils.debug('ROSSerial Decode ' + remainingMsgLen);
             if (remainingMsgLen < RS_MSG_MIN_LENGTH)
                 break;
             // Extract header
-            var payloadLength = rosSerialMsg[msgPos + RS_MSG_LEN_LOW_POS] +
+            const payloadLength = rosSerialMsg[msgPos + RS_MSG_LEN_LOW_POS] +
                 rosSerialMsg[msgPos + RS_MSG_LEN_HIGH_POS] * 256;
-            var topicID = rosSerialMsg[msgPos + RS_MSG_TOPIC_ID_LOW_POS] +
+            const topicID = rosSerialMsg[msgPos + RS_MSG_TOPIC_ID_LOW_POS] +
                 rosSerialMsg[msgPos + RS_MSG_TOPIC_ID_HIGH_POS] * 256;
             // RICUtils.debug('ROSSerial ' + payloadLength + ' topic ' + topicID);
             // Check max length
@@ -100,7 +83,7 @@ var RICROSSerial = /** @class */ (function () {
             if (rosSerialMsg.length < payloadLength + RS_MSG_MIN_LENGTH)
                 break;
             // Extract payload
-            var payload = rosSerialMsg.slice(msgPos + RS_MSG_PAYLOAD_POS, msgPos + RS_MSG_PAYLOAD_POS + payloadLength);
+            const payload = rosSerialMsg.slice(msgPos + RS_MSG_PAYLOAD_POS, msgPos + RS_MSG_PAYLOAD_POS + payloadLength);
             // RICUtils.debug('ROSSerial ' + RICUtils.bufferToHex(payload));
             // Extract SmartServos message
             if (topicID === ROSTOPIC_V2_SMART_SERVOS) {
@@ -134,18 +117,18 @@ var RICROSSerial = /** @class */ (function () {
             msgPos += RS_MSG_PAYLOAD_POS + payloadLength + 1;
             // RICUtils.debug('MsgPos ' + msgPos);
         }
-    };
-    RICROSSerial.extractSmartServos = function (buf) {
+    }
+    static extractSmartServos(buf) {
         // Each group of attributes for a servo is a fixed size
-        var ROS_SMART_SERVOS_ATTR_GROUP_BYTES = 6;
-        var numGroups = Math.floor(buf.length / ROS_SMART_SERVOS_ATTR_GROUP_BYTES);
-        var msg = { smartServos: [] };
-        var bufPos = 0;
-        for (var i = 0; i < numGroups; i++) {
-            var servoId = buf[bufPos];
-            var servoPos = RICUtils_js_1.default.getBEInt16FromBuf(buf, bufPos + 1);
-            var servoCurrent = RICUtils_js_1.default.getBEUint16FromBuf(buf, bufPos + 3);
-            var servoStatus = buf[bufPos + 5];
+        const ROS_SMART_SERVOS_ATTR_GROUP_BYTES = 6;
+        const numGroups = Math.floor(buf.length / ROS_SMART_SERVOS_ATTR_GROUP_BYTES);
+        const msg = { smartServos: [] };
+        let bufPos = 0;
+        for (let i = 0; i < numGroups; i++) {
+            const servoId = buf[bufPos];
+            const servoPos = RICUtils.getBEInt16FromBuf(buf, bufPos + 1);
+            const servoCurrent = RICUtils.getBEUint16FromBuf(buf, bufPos + 3);
+            const servoStatus = buf[bufPos + 5];
             bufPos += ROS_SMART_SERVOS_ATTR_GROUP_BYTES;
             msg.smartServos.push({
                 id: servoId,
@@ -155,26 +138,26 @@ var RICROSSerial = /** @class */ (function () {
             });
         }
         return msg;
-    };
-    RICROSSerial.extractAccel = function (buf) {
+    }
+    static extractAccel(buf) {
         // Three accelerometer floats
-        var x = RICUtils_js_1.default.getBEFloatFromBuf(buf);
-        var y = RICUtils_js_1.default.getBEFloatFromBuf(buf.slice(4));
-        var z = RICUtils_js_1.default.getBEFloatFromBuf(buf.slice(8));
+        const x = RICUtils.getBEFloatFromBuf(buf);
+        const y = RICUtils.getBEFloatFromBuf(buf.slice(4));
+        const z = RICUtils.getBEFloatFromBuf(buf.slice(8));
         return { accel: { x: x / 1024, y: y / 1024, z: z / 1024 } };
-    };
-    RICROSSerial.extractPowerStatus = function (buf) {
+    }
+    static extractPowerStatus(buf) {
         // Power indicator values
         // RICUtils.debug(`PowerStatus ${RICUtils.bufferToHex(buf)}`);
-        var remCapPC = RICUtils_js_1.default.getBEUint8FromBuf(buf, 0);
-        var tempDegC = RICUtils_js_1.default.getBEUint8FromBuf(buf, 1);
-        var remCapMAH = RICUtils_js_1.default.getBEUint16FromBuf(buf, 2);
-        var fullCapMAH = RICUtils_js_1.default.getBEUint16FromBuf(buf, 4);
-        var currentMA = RICUtils_js_1.default.getBEInt16FromBuf(buf, 6);
-        var power5VOnTimeSecs = RICUtils_js_1.default.getBEUint16FromBuf(buf, 8);
-        var powerFlags = RICUtils_js_1.default.getBEUint16FromBuf(buf, 10);
-        var isOnUSBPower = (powerFlags & 0x0001) != 0;
-        var is5VOn = (powerFlags & 0x0002) != 0;
+        const remCapPC = RICUtils.getBEUint8FromBuf(buf, 0);
+        const tempDegC = RICUtils.getBEUint8FromBuf(buf, 1);
+        const remCapMAH = RICUtils.getBEUint16FromBuf(buf, 2);
+        const fullCapMAH = RICUtils.getBEUint16FromBuf(buf, 4);
+        const currentMA = RICUtils.getBEInt16FromBuf(buf, 6);
+        const power5VOnTimeSecs = RICUtils.getBEUint16FromBuf(buf, 8);
+        const powerFlags = RICUtils.getBEUint16FromBuf(buf, 10);
+        const isOnUSBPower = (powerFlags & 0x0001) != 0;
+        const is5VOn = (powerFlags & 0x0002) != 0;
         return {
             powerStatus: {
                 battRemainCapacityPercent: remCapPC,
@@ -187,26 +170,24 @@ var RICROSSerial = /** @class */ (function () {
                 powerUSBIsConnected: isOnUSBPower,
             },
         };
-    };
-    RICROSSerial.extractAddOnStatus = function (buf, addOnManager) {
+    }
+    static extractAddOnStatus(buf, addOnManager) {
         // RICUtils.debug(`AddOnRawData ${RICUtils.bufferToHex(buf)}`);
         // Each group of attributes for a add-on is a fixed size
-        var ROS_ADDON_ATTR_GROUP_BYTES = 12;
-        var numGroups = Math.floor(buf.length / ROS_ADDON_ATTR_GROUP_BYTES);
-        var msg = { addons: [] };
-        var bufPos = 0;
-        for (var i = 0; i < numGroups; i++) {
-            var addOnId = buf[bufPos];
-            var status_1 = buf[bufPos + 1];
-            var addOnData = buf.slice(bufPos + 2, bufPos + 12);
+        const ROS_ADDON_ATTR_GROUP_BYTES = 12;
+        const numGroups = Math.floor(buf.length / ROS_ADDON_ATTR_GROUP_BYTES);
+        const msg = { addons: [] };
+        let bufPos = 0;
+        for (let i = 0; i < numGroups; i++) {
+            const addOnId = buf[bufPos];
+            const status = buf[bufPos + 1];
+            const addOnData = buf.slice(bufPos + 2, bufPos + 12);
             bufPos += ROS_ADDON_ATTR_GROUP_BYTES;
-            var addOnRec = addOnManager.processPublishedData(addOnId, status_1, addOnData);
+            const addOnRec = addOnManager.processPublishedData(addOnId, status, addOnData);
             if (addOnRec !== null) {
                 msg.addons.push(addOnRec);
             }
         }
         return msg;
-    };
-    return RICROSSerial;
-}());
-exports.default = RICROSSerial;
+    }
+}

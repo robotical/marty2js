@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Struct
@@ -9,29 +8,8 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var __read = (this && this.__read) || function (o, n) {
-    var m = typeof Symbol === "function" && o[Symbol.iterator];
-    if (!m) return o;
-    var i = m.call(o), r, ar = [], e;
-    try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
-    }
-    catch (error) { e = { error: error }; }
-    finally {
-        try {
-            if (r && !r.done && (m = i["return"])) m.call(i);
-        }
-        finally { if (e) throw e.error; }
-    }
-    return ar;
-};
-var __spread = (this && this.__spread) || function () {
-    for (var ar = [], i = 0; i < arguments.length; i++) ar = ar.concat(__read(arguments[i]));
-    return ar;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var Struct = /** @class */ (function () {
-    function Struct(format) {
+export default class Struct {
+    constructor(format) {
         this._rechk = /^([<>])?(([1-9]\d*)?([xcbB?hHiIfdsp]))*$/;
         this._refmt = /([1-9]\d*)?([xcbB?hHiIfdsp])/g;
         this._format = '';
@@ -44,12 +22,12 @@ var Struct = /** @class */ (function () {
         this._argIdx = 0;
         this._littleEndian = false;
         // Validate format
-        var regexRslt = this._rechk.exec(format);
+        const regexRslt = this._rechk.exec(format);
         if (!regexRslt) {
             throw new RangeError('Invalid format string');
         }
         // Format processing
-        var fPos = 0;
+        let fPos = 0;
         this._format = '';
         // Check for endian-ness indicator
         if (fPos < format.length) {
@@ -65,7 +43,7 @@ var Struct = /** @class */ (function () {
         // Expand numbers in the format
         while (fPos < format.length) {
             // Process current position in the format code
-            var repeatLenCode = parseInt(format.substr(fPos), 10);
+            let repeatLenCode = parseInt(format.substr(fPos), 10);
             if (isNaN(repeatLenCode)) {
                 repeatLenCode = 1;
             }
@@ -76,7 +54,7 @@ var Struct = /** @class */ (function () {
                     fPos++;
             }
             // Expand the single char to multiple (even in the case of string)
-            for (var i = 0; i < repeatLenCode; i++) {
+            for (let i = 0; i < repeatLenCode; i++) {
                 this._format += format[fPos];
             }
             // In the case of strings we need to know when to move on to the next variable
@@ -86,11 +64,11 @@ var Struct = /** @class */ (function () {
             fPos++;
         }
     }
-    Struct.prototype.size = function () {
-        var outLen = 0;
-        var fPos = 0;
+    size() {
+        let outLen = 0;
+        let fPos = 0;
         while (fPos < this._format.length) {
-            var elLen = 0;
+            let elLen = 0;
             switch (this._format[fPos]) {
                 case 'x': {
                     elLen = 1;
@@ -150,10 +128,10 @@ var Struct = /** @class */ (function () {
             fPos += 1;
         }
         return outLen;
-    };
-    Struct.prototype._packElem = function (fPos, arg) {
+    }
+    _packElem(fPos, arg) {
         // Handle struct code
-        var argInc = 1;
+        let argInc = 1;
         switch (this._format[fPos]) {
             case 'x': {
                 // Skip
@@ -222,8 +200,8 @@ var Struct = /** @class */ (function () {
                 break;
             }
             case 's': {
-                var inStr = arg;
-                var chVal = inStr.length >= this._strPos ? inStr.charCodeAt(this._strPos++) : 0;
+                const inStr = arg;
+                const chVal = inStr.length >= this._strPos ? inStr.charCodeAt(this._strPos++) : 0;
                 this._outBufferDataView.setUint8(this._outBufPos, chVal);
                 this._outBufPos += 1;
                 argInc = 0;
@@ -236,35 +214,27 @@ var Struct = /** @class */ (function () {
         }
         this._argIdx += argInc;
         return fPos + 1;
-    };
-    Struct.prototype.packInto = function (buffer, offset) {
-        var args = [];
-        for (var _i = 2; _i < arguments.length; _i++) {
-            args[_i - 2] = arguments[_i];
-        }
+    }
+    packInto(buffer, offset, ...args) {
         this._outBufPos = offset;
         this._outBufferDataView = new DataView(buffer.buffer);
         this._strPos = 0;
         // Iterate format string
         this._argIdx = 0;
-        var fPos = 0;
+        let fPos = 0;
         while (fPos < this._format.length) {
             if (this._argIdx >= args.length)
                 break;
             fPos = this._packElem(fPos, args[this._argIdx]);
         }
-    };
-    Struct.prototype.pack = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
+    }
+    pack(...args) {
         // Generate out buffer
-        var outBuffer = new Uint8Array(this.size());
-        this.packInto.apply(this, __spread([outBuffer, 0], args));
+        const outBuffer = new Uint8Array(this.size());
+        this.packInto(outBuffer, 0, ...args);
         return outBuffer;
-    };
-    Struct.prototype._unpackElem = function (fPos, outArray) {
+    }
+    _unpackElem(fPos, outArray) {
         // Handle struct code
         switch (this._format[fPos]) {
             case 'x': {
@@ -280,7 +250,7 @@ var Struct = /** @class */ (function () {
             }
             case 'c': {
                 // Character
-                var charCode = this._inBufferDataView.getInt8(this._inBufPos);
+                const charCode = this._inBufferDataView.getInt8(this._inBufPos);
                 outArray.push(String.fromCharCode(charCode));
                 this._inBufPos += 1;
                 break;
@@ -335,7 +305,7 @@ var Struct = /** @class */ (function () {
             }
             case 's': {
                 // String
-                var chCode = this._inBufferDataView.getInt8(this._inBufPos);
+                const chCode = this._inBufferDataView.getInt8(this._inBufPos);
                 this._formedStr += String.fromCharCode(chCode);
                 this._inBufPos += 1;
                 break;
@@ -347,23 +317,21 @@ var Struct = /** @class */ (function () {
             }
         }
         return fPos + 1;
-    };
-    Struct.prototype.unpackFrom = function (buffer, offset) {
+    }
+    unpackFrom(buffer, offset) {
         // Get DataView onto input buffer
         this._inBufferDataView = new DataView(buffer.buffer);
-        var outArray = new Array();
+        const outArray = new Array();
         this._formedStr = '';
         // Iterate format string
-        var fPos = offset;
+        let fPos = offset;
         this._inBufPos = 0;
         while (fPos < this._format.length) {
             fPos = this._unpackElem(fPos, outArray);
         }
         return outArray;
-    };
-    Struct.prototype.unpack = function (inBuf) {
+    }
+    unpack(inBuf) {
         return this.unpackFrom(inBuf, 0);
-    };
-    return Struct;
-}());
-exports.default = Struct;
+    }
+}

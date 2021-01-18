@@ -4,9 +4,9 @@ import CommsStats from './CommsStats.js';
 import RICAddOnManager from './RICAddOnManager.js';
 import RICConnManager from './RICConnManager.js';
 import { ROSSerialSmartServos, ROSSerialIMU, ROSSerialPowerStatus, ROSSerialAddOnStatusList } from './RICROSSerial.js';
-import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICSubscription, RICConnEventListener, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType } from './RICTypes.js';
+import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType, RICEventIF } from './RICTypes.js';
 export declare class Marty {
-    _connEventListener: RICConnEventListener | null;
+    _ricEventListener: RICEventIF | null;
     _systemInfo: RICSystemInfo | null;
     _lastestVersionInfo: RICUpdateInfo | null;
     _updateESPRequired: boolean;
@@ -17,9 +17,6 @@ export declare class Marty {
     _hwElems: Array<RICHWElem>;
     _addOnManager: RICAddOnManager;
     _discoveryListener: RICDiscoveryListener | null;
-    _connSubscrOnRx: RICSubscription | null;
-    _connSubscrOnDisconnect: RICSubscription | null;
-    _connSubscrOnStateChange: RICSubscription | null;
     _progressAfterDownload: number;
     _progressAfterUpload: number;
     _progressAfterRestart: number;
@@ -40,6 +37,7 @@ export declare class Marty {
         RightArm: string;
         Eyes: string;
     };
+    _subscribeRateHz: number;
     FW_UPDATE_CHECKS_BEFORE_ASSUME_FAILED: number;
     FIRMWARE_TYPE_FOR_MAIN_ESP32_FW: string;
     NON_FIRMWARE_ELEM_TYPES: string[];
@@ -49,8 +47,8 @@ export declare class Marty {
     TEST_PRETEND_INITIAL_VERSIONS_DIFFER: boolean;
     TEST_PRETEND_FINAL_VERSIONS_MATCH: boolean;
     constructor();
-    setConnEventListener(listener: RICConnEventListener): void;
-    removeConnEventListener(): void;
+    setEventListener(listener: RICEventIF): void;
+    removeEventListener(): void;
     setFetchBlobCallback(fetchBlobFn: RICFetchBlobFnType): void;
     /**
      * Connect to a RIC
@@ -120,6 +118,14 @@ export declare class Marty {
      *
      */
     getRICCalibInfo(): Promise<RICCalibInfo>;
+    /**
+     *
+     * subscribeForUpdates
+     * @param enable - true to send command to enable subscription (false to remove sub)
+     * @returns Promise<void>
+     *
+     */
+    subscribeForUpdates(enable: boolean): Promise<void>;
     /**
      *
      * runTrajectory
@@ -207,6 +213,6 @@ export declare class Marty {
     onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void;
     onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
     getRICStateInfo(): RICStateInfo;
-    _objectEntries(obj: RICCmdParams): Array<Array<string | number>>;
+    _objectEntries(obj: RICCmdParams | undefined): Array<Array<string | number>>;
     _reportConnEvent(connEvent: RICEvent, connEventArgs?: RICConnEventArgs): void;
 }

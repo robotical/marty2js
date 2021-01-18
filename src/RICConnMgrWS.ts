@@ -11,7 +11,7 @@
 
 import WebSocket from "isomorphic-ws";
 import RICMsgHandler from "./RICMsgHandler.js";
-import { DiscoveredRIC, RICConnEventListener, RICEvent, RICIFType } from "./RICTypes.js";
+import { DiscoveredRIC, RICConnEventFn, RICEvent, RICIFType } from "./RICTypes.js";
 import RICUtils from "./RICUtils.js";
 
 export default class RICConnMgrWS {
@@ -20,7 +20,7 @@ export default class RICConnMgrWS {
     _ricMsgHandler: RICMsgHandler | null = null;
 
     // Callback to RICConnManager
-    _onStateChangeListener: RICConnEventListener | null = null;
+    _onStateChangeListener: RICConnEventFn | null = null;
 
     // RIC to connect to
     _ricToConnectTo: DiscoveredRIC | null = null;
@@ -29,7 +29,7 @@ export default class RICConnMgrWS {
     _webSocket: WebSocket | null = null;
 
     // Is connected
-    _isConnected: boolean = false;
+    _webSocketIsConnected: boolean = false;
 
     /**
      * Constructor
@@ -47,7 +47,7 @@ export default class RICConnMgrWS {
      * @param listener: (ifType: RICIFType, stateChangeStr: string, args: RICConnEventArgs | null) => void
      *
      */
-    onStateChange(listener: RICConnEventListener): void {
+    onStateChange(listener: RICConnEventFn): void {
         this._onStateChangeListener = listener;
     }
 
@@ -58,7 +58,7 @@ export default class RICConnMgrWS {
      *
      */
     async getIsConnected(): Promise<boolean> {
-        return this._isConnected;
+        return this._webSocketIsConnected;
     }
 
     /**
@@ -73,7 +73,7 @@ export default class RICConnMgrWS {
         if (this._onStateChangeListener) {
             this._onStateChangeListener(RICEvent.CONNECTING_RIC,
                 {
-                    url: discoveredRIC.url,
+                    ipAddress: discoveredRIC.ipAddress,
                     ifType: RICIFType.RIC_INTERFACE_WIFI,
                 });
         }
@@ -90,7 +90,7 @@ export default class RICConnMgrWS {
             if (this._onStateChangeListener) {
                 this._onStateChangeListener(RICEvent.CONNECTING_RIC_FAIL,
                     {
-                        url: discoveredRIC.url,
+                        ipAddress: discoveredRIC.ipAddress,
                         ifType: RICIFType.RIC_INTERFACE_WIFI,
                     });
                 return false;
@@ -101,7 +101,7 @@ export default class RICConnMgrWS {
         if (this._onStateChangeListener) {
             this._onStateChangeListener(RICEvent.CONNECTED_RIC,
                 {
-                    url: this._ricToConnectTo.url,
+                    ipAddress: discoveredRIC.ipAddress,
                     name: this._ricToConnectTo.name,
                     ifType: RICIFType.RIC_INTERFACE_WIFI,
                 });
@@ -120,6 +120,9 @@ export default class RICConnMgrWS {
 
         // Discard connect info
         this._ricToConnectTo = null;
+
+        // Disconnect websocket
+        this._webSocket?.close();
 
         // Report disconnection
         if (this._onStateChangeListener !== null) {
@@ -141,127 +144,98 @@ export default class RICConnMgrWS {
             return true;
         }
 
+        // Form websocket address
+        const wsURL = "ws://" + this._ricToConnectTo._hostnameOrIPAddress + "/ws";
+
         // Connect to websocket
-        this._webSocket = new WebSocket(this._ricToConnectTo.url);
-        if (!this._webSocket) {
-            RICUtils.debug("Unable to create WebSocket");
+        try {
+            this._webSocket = await this.webSocketOpen(wsURL);
+        } catch (error) {
+            RICUtils.debug(`Unable to create WebSocket ${error.toString()}`);
             return false;
         }
 
-        // Debug
-        RICUtils.debug('Attempting WebSocket connection');
-
-        // Open socket
-        this._webSocket.binaryType = "arraybuffer";
-        this._webSocket.onopen = (evt: WebSocket.OpenEvent) => {
-            RICUtils.debug('WebSocket connection opened ' + evt.toString());
-        };
-
         this._webSocket.onmessage = (evt: WebSocket.MessageEvent) => {
-            RICUtils.debug("WebSocket rx");
+            // RICUtils.debug("WebSocket rx");
             if (evt.data instanceof ArrayBuffer) {
                 const msg = new Uint8Array(evt.data);
-                this._onMsgRx(msg, null);
+                this._onMsgRx(msg);
             }
         }
 
         this._webSocket.onclose = (evt: WebSocket.CloseEvent) => {
             RICUtils.debug('Websocket connection closed ' + evt.toString());
             this._webSocket = null;
+            this._webSocketIsConnected = false;
         }
-
-        this._webSocket.onerror = function (evt) {
-            RICUtils.debug('Websocket error: ' + evt);
-        }
-
-        // // We're connected
-        // this._isConnected = true;
 
         // Ok
         return true;
     }
 
-    async sendTxMsg(msg: Uint8Array, sendWithResponse: boolean): Promise<void> {
-        // TODO RD
-
-        RICUtils.debug("sendTxMsgNoAwait " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
-
-        // // Check valid
-        // if (this._bleDevice === null) {
-        //   return;
-        // }
-
-        // // Convert to Base64
-        // const msgFrameBase64 = RICUtils.btoa(msg);
-
-        // // Write to the characteristic
-        // if (sendWithResponse) {
-        //   // RICUtils.debug('sendFrame withResponse');
-        //   await this._bleDevice.writeCharacteristicWithResponseForService(
-        //     this._RICServiceUUID,
-        //     this._RICCmdUUID,
-        //     msgFrameBase64!,
-        //   );
-        // } else {
-        //   // RICUtils.debug('sendFrame withoutResponse');
-        //   await this._bleDevice.writeCharacteristicWithoutResponseForService(
-        //     this._RICServiceUUID,
-        //     this._RICCmdUUID,
-        //     msgFrameBase64!,
-        //   );
-        // }
-    }
-
-    async sendTxMsgNoAwait(msg: Uint8Array, sendWithResponse: boolean): Promise<void> {
-        // TODO RD
-
-        RICUtils.debug("sendTxMsgNoAwait " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
-        // // Convert to Base64
-        // const msgFrameBase64 = RICUtils.btoa(msg);
-
-        // // Write to the characteristic
-        // if (sendWithResponse) {
-        //   // RICUtils.debug('sendFrame withResponse');
-        //   return this._bleDevice!.writeCharacteristicWithResponseForService(
-        //     this._RICServiceUUID,
-        //     this._RICCmdUUID,
-        //     msgFrameBase64!,
-        //   );
-        // } else {
-        //   // RICUtils.debug('sendFrame withoutResponse');
-        //   return this._bleDevice!.writeCharacteristicWithoutResponseForService(
-        //     this._RICServiceUUID,
-        //     this._RICCmdUUID,
-        //     msgFrameBase64!,
-        //   );
-        // }
-    }
-
-    _onMsgRx(msg: Uint8Array | null, error: string | null) {
-
-        if (error) {
-            // TODO RD
-            // this.emit(maybe dont want to emit here - just add to comms stats?);
-            // this.reportError(error.message);
-            return;
-        }
-
-        // TODO RD
-        // // Extract message
-        // const msgFrameBase64 = characteristic!.value;
-        // //@ts-ignore
-        // const rxFrame = RICUtils.atob(msgFrameBase64);
-
-        // // Debug
-        // // RICUtils.debug('_onMsgRx from BLE ' + RICUtils.bufferToHex(rxFrame));
-
-        // Handle
-        if (msg !== null && this._ricMsgHandler) {
+    async webSocketOpen(url: string): Promise<WebSocket> {
+        return new Promise((resolve, reject) => {
 
             // Debug
-            RICUtils.debug("onMsgRx " + RICUtils.bufferToHex(msg));
+            // RICUtils.debug('Attempting WebSocket connection');
 
-            // Handle message
+            // Open the socket
+            try {
+                const webSocket = new WebSocket(url);
+
+                // Open socket
+                webSocket.binaryType = "arraybuffer";
+                webSocket.onopen = (evt: WebSocket.OpenEvent) => {
+                    RICUtils.debug('WebSocket connection opened ' + evt.toString());
+                    // // We're connected
+                    this._webSocketIsConnected = true;
+                    resolve(webSocket);
+                };
+                webSocket.onerror = function (evt) {
+                    RICUtils.warn('Websocket error: ' + evt.toString());
+                    reject(evt);
+                }
+            } catch (error) {
+                RICUtils.warn('Websocket open failed: ' + error.toString());
+                reject(error);
+            }
+        });
+    }
+
+    // @ts-ignore unused parameter (it is used for BLE comms)
+    async sendTxMsg(msg: Uint8Array, sendWithResponse: boolean): Promise<void> {
+        // Check connected
+        if (!this._webSocketIsConnected)
+            return;
+
+        // Debug
+        // RICUtils.debug("sendTxMsg " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
+
+        // Send over websocket
+        await this._webSocket?.send(msg);
+
+    }
+
+    // @ts-ignore unused parameter (it is used for BLE comms)
+    async sendTxMsgNoAwait(msg: Uint8Array, sendWithResponse: boolean): Promise<void> {
+        // Check connected
+        if (!this._webSocketIsConnected)
+            return;
+
+        // Debug
+        // RICUtils.debug("sendTxMsgNoAwait " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
+
+        // Send over websocket
+        this._webSocket?.send(msg);
+    }
+
+    _onMsgRx(msg: Uint8Array | null) {
+
+        // Debug
+        // RICUtils.debug('_onMsgRx ' + RICUtils.bufferToHex(msg));
+
+        // Handle message
+        if (msg !== null && this._ricMsgHandler) {
             this._ricMsgHandler.handleNewRxMsg(msg);
         }
     }

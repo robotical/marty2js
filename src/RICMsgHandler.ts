@@ -230,7 +230,7 @@ export default class RICMsgHandler {
         this._addOnManager,
       );
     } else {
-      RICUtils.debug(`handleNewRxMsg unsupported protocol ${rxProtocol}`);
+      RICUtils.warn(`handleNewRxMsg unsupported protocol ${rxProtocol}`);
     }
 
     // Handle matching of commands and responses
@@ -245,6 +245,15 @@ export default class RICMsgHandler {
     return await this.sendRICREST(
       cmdStr,
       RICRESTElemCode.RICREST_REST_ELEM_URL,
+      msgTracking,
+    );
+  }
+
+  async sendRICRESTCmdFrame<T>(cmdStr: string, msgTracking: boolean): Promise<T> {
+    // Send
+    return await this.sendRICREST(
+      cmdStr,
+      RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME,
       msgTracking,
     );
   }
@@ -280,7 +289,7 @@ export default class RICMsgHandler {
     cmdMsg.set(cmdBytes, RICREST_HEADER_PAYLOAD_POS);
 
     // Send
-    return await this.sendCommsMsg(
+    return await this.sendCommsMsg<T>(
       cmdMsg,
       ProtocolMsgDirection.MSG_DIRECTION_COMMAND,
       ProtocolMsgProtocol.MSG_PROTOCOL_RICREST,
@@ -315,14 +324,14 @@ export default class RICMsgHandler {
         //   } data ${RICUtils.bufferToHex(msgBuf)}`,
         // );
 
-        // Update message tracking
-        if (isNumbered) {
-          this.msgTrackingTxCmdMsg<T>(msgBuf, withResponse, resolve, reject);
-          this._currentMsgHandle++;
-        }
-
         // Wrap into HDLC
         const framedMsg = this._miniHDLC.encode(msgBuf);
+
+        // Update message tracking
+        if (isNumbered) {
+          this.msgTrackingTxCmdMsg<T>(framedMsg, withResponse, resolve, reject);
+          this._currentMsgHandle++;
+        }
 
         // Send
         if (this._msgSender) {
@@ -337,7 +346,7 @@ export default class RICMsgHandler {
         reject(error);
       }
     });
-    promise.catch(error => RICUtils.debug(error));
+    promise.catch(error => RICUtils.warn(error));
     return promise;
   }
 
@@ -465,7 +474,7 @@ export default class RICMsgHandler {
                 this._msgTrackInfos[i].withResponse,
               );
             } catch (error) {
-              RICUtils.debug('Retry message failed' + error.toString());
+              RICUtils.warn('Retry message failed' + error.toString());
             }
           }
           this._commsStats.recordMsgRetry();

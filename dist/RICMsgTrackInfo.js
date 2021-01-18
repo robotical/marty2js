@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // RICMsgTrackInfo
@@ -9,35 +8,28 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var RICUtils_1 = __importDefault(require("./RICUtils"));
-var FileBlockTrackInfo = /** @class */ (function () {
-    function FileBlockTrackInfo(prom) {
-        var _this = this;
+import RICUtils from "./RICUtils";
+export class FileBlockTrackInfo {
+    constructor(prom) {
         this.isDone = false;
         this.prom = prom;
-        this.prom.then(function () {
+        this.prom.then(() => {
             // RICUtils.debug('send complete');
-            _this.isDone = true;
-        }, function (rej) {
-            RICUtils_1.default.debug('FileBlockTrackInfo send rejected ' + rej.toString());
-            _this.isDone = true;
+            this.isDone = true;
+        }, rej => {
+            RICUtils.debug('FileBlockTrackInfo send rejected ' + rej.toString());
+            this.isDone = true;
         });
     }
-    FileBlockTrackInfo.prototype.isComplete = function () {
+    isComplete() {
         return this.isDone;
-    };
-    FileBlockTrackInfo.prototype.get = function () {
+    }
+    get() {
         return this.prom;
-    };
-    return FileBlockTrackInfo;
-}());
-exports.FileBlockTrackInfo = FileBlockTrackInfo;
-var MsgTrackInfo = /** @class */ (function () {
-    function MsgTrackInfo() {
+    }
+}
+export default class MsgTrackInfo {
+    constructor() {
         this.msgOutstanding = false;
         this.msgFrame = null;
         this.msgSentMs = 0;
@@ -46,7 +38,7 @@ var MsgTrackInfo = /** @class */ (function () {
         this.msgHandle = 0;
         this.msgOutstanding = false;
     }
-    MsgTrackInfo.prototype.set = function (msgOutstanding, msgFrame, withResponse, msgHandle, resolve, reject) {
+    set(msgOutstanding, msgFrame, withResponse, msgHandle, resolve, reject) {
         this.msgOutstanding = msgOutstanding;
         this.msgFrame = msgFrame;
         this.retryCount = 0;
@@ -55,7 +47,5 @@ var MsgTrackInfo = /** @class */ (function () {
         this.msgHandle = msgHandle;
         this.resolve = resolve;
         this.reject = reject;
-    };
-    return MsgTrackInfo;
-}());
-exports.default = MsgTrackInfo;
+    }
+}

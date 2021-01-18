@@ -1,4 +1,3 @@
-"use strict";
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // CommsStats
@@ -9,9 +8,8 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-Object.defineProperty(exports, "__esModule", { value: true });
-var CommsStats = /** @class */ (function () {
-    function CommsStats() {
+export default class CommsStats {
+    constructor() {
         this._msgRxCount = 0;
         this._msgRxCountInWindow = 0;
         this._msgRxLastCalcMs = 0;
@@ -33,7 +31,7 @@ var CommsStats = /** @class */ (function () {
         this._msgPowerStatus = 0;
         this._msgAddOnPub = 0;
     }
-    CommsStats.prototype.clear = function () {
+    clear() {
         this._msgRxCount = 0;
         this._msgRxCountInWindow = 0;
         this._msgRxLastCalcMs = Date.now();
@@ -54,12 +52,12 @@ var CommsStats = /** @class */ (function () {
         this._msgIMU = 0;
         this._msgPowerStatus = 0;
         this._msgAddOnPub = 0;
-    };
-    CommsStats.prototype.msgRx = function () {
+    }
+    msgRx() {
         this._msgRxCount++;
         this._msgRxCountInWindow++;
-    };
-    CommsStats.prototype.getMsgRxRate = function () {
+    }
+    getMsgRxRate() {
         if (this._msgRxLastCalcMs + 1000 < Date.now()) {
             this._msgRxRate =
                 (1000.0 * this._msgRxCountInWindow) /
@@ -68,15 +66,15 @@ var CommsStats = /** @class */ (function () {
             this._msgRxCountInWindow = 0;
         }
         return this._msgRxRate;
-    };
-    CommsStats.prototype.msgTooShort = function () {
+    }
+    msgTooShort() {
         this._msgTooShort++;
-    };
-    CommsStats.prototype.msgTx = function () {
+    }
+    msgTx() {
         this._msgTxCount++;
         this._msgTxCountInWindow++;
-    };
-    CommsStats.prototype.getMsgTxRate = function () {
+    }
+    getMsgTxRate() {
         if (this._msgTxLastCalcMs + 1000 < Date.now()) {
             this._msgTxRate =
                 (1000.0 * this._msgTxCountInWindow) /
@@ -85,54 +83,52 @@ var CommsStats = /** @class */ (function () {
             this._msgTxCountInWindow = 0;
         }
         return this._msgTxRate;
-    };
-    CommsStats.prototype.getRTWorstMs = function () {
+    }
+    getRTWorstMs() {
         return this._msgRoundtripWorstMs;
-    };
-    CommsStats.prototype.getRTLastMs = function () {
+    }
+    getRTLastMs() {
         return this._msgRoundtripLastMs;
-    };
-    CommsStats.prototype.getRTBestMs = function () {
+    }
+    getRTBestMs() {
         return this._msgRoundtripBestMs;
-    };
-    CommsStats.prototype.getRetries = function () {
+    }
+    getRetries() {
         return this._msgRetry;
-    };
-    CommsStats.prototype.recordMsgNumCollision = function () {
+    }
+    recordMsgNumCollision() {
         this._msgNumCollisions++;
-    };
-    CommsStats.prototype.recordMsgNumUnmatched = function () {
+    }
+    recordMsgNumUnmatched() {
         this._msgNumUnmatched++;
-    };
-    CommsStats.prototype.recordMsgResp = function (roundTripMs) {
+    }
+    recordMsgResp(roundTripMs) {
         if (this._msgRoundtripWorstMs < roundTripMs)
             this._msgRoundtripWorstMs = roundTripMs;
         if (this._msgRoundtripBestMs == 0 || this._msgRoundtripBestMs > roundTripMs)
             this._msgRoundtripBestMs = roundTripMs;
         this._msgRoundtripLastMs = roundTripMs;
-    };
-    CommsStats.prototype.recordMsgTimeout = function () {
+    }
+    recordMsgTimeout() {
         this._msgTimeout++;
-    };
-    CommsStats.prototype.recordMsgRetry = function () {
+    }
+    recordMsgRetry() {
         this._msgRetry++;
-    };
-    CommsStats.prototype.recordSmartServos = function () {
+    }
+    recordSmartServos() {
         this._msgSmartServos++;
         this.msgRx();
-    };
-    CommsStats.prototype.recordIMU = function () {
+    }
+    recordIMU() {
         this._msgIMU++;
         // Don't call msgRx() as double counting msgs with smartServos
-    };
-    CommsStats.prototype.recordPowerStatus = function () {
+    }
+    recordPowerStatus() {
         this._msgPowerStatus++;
         this.msgRx();
-    };
-    CommsStats.prototype.recordAddOnPub = function () {
+    }
+    recordAddOnPub() {
         this._msgAddOnPub++;
         this.msgRx();
-    };
-    return CommsStats;
-}());
-exports.default = CommsStats;
+    }
+}

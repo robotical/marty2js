@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import CommsStats from './CommsStats.js';
 import MsgTrackInfo from './RICMsgTrackInfo.js';
 import { ROSSerialIMU, ROSSerialSmartServos, ROSSerialPowerStatus, ROSSerialAddOnStatusList } from './RICROSSerial.js';
@@ -56,6 +57,7 @@ export default class RICMsgHandler {
     handleNewRxMsg(rxMsg: Uint8Array): void;
     _onHDLCFrameDecode(rxMsg: Uint8Array): void;
     sendRICRESTURL<T>(cmdStr: string, msgTracking: boolean): Promise<T>;
+    sendRICRESTCmdFrame<T>(cmdStr: string, msgTracking: boolean): Promise<T>;
     sendRICREST<T>(cmdStr: string, ricRESTElemCode: RICRESTElemCode, msgTracking: boolean): Promise<T>;
     sendRICRESTBytes<T>(cmdBytes: Uint8Array, ricRESTElemCode: RICRESTElemCode, isNumbered: boolean, withResponse: boolean): Promise<T>;
     sendCommsMsg<T>(msgPayload: Uint8Array, msgDirection: ProtocolMsgDirection, msgProtocol: ProtocolMsgProtocol, isNumbered: boolean, withResponse: boolean): Promise<T>;

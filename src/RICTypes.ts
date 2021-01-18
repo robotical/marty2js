@@ -31,13 +31,21 @@ export class DiscoveredRIC {
     _name = '';
     _id = '';
     _rssi = -150;
-    _url = '';
-    constructor(localName: string, name: string, id: string, rssi: number, url: string) {
-        this._localName = localName;
+    _hostnameOrIPAddress = '';
+    _interface = RICIFType.RIC_INTERFACE_WIFI;
+    constructor(localNameOrIPAddress: string, name: string, id?: string, rssi?: number) {
+        if (typeof id !== 'undefined') {
+            this._localName = localNameOrIPAddress;
+            this._interface = RICIFType.RIC_INTERFACE_BLE;
+            this._id = id;
+            if (typeof rssi !== 'undefined') {
+                this._rssi = rssi;
+            }
+        } else {
+            this._interface = RICIFType.RIC_INTERFACE_WIFI;
+            this._hostnameOrIPAddress = localNameOrIPAddress;
+        }
         this._name = name;
-        this._id = id;
-        this._rssi = rssi;
-        this._url = url;
     }
     get name(): string {
         if (this._localName !== null && this._localName.length > 0) {
@@ -56,8 +64,8 @@ export class DiscoveredRIC {
         if (this._rssi !== null) return this._rssi;
         return -100;
     }
-    get url(): string {
-        if (this._url !== null) return this._url;
+    get ipAddress(): string {
+        if (this._hostnameOrIPAddress !== null) return this._hostnameOrIPAddress;
         return '';
     }
 }
@@ -259,7 +267,7 @@ export interface Dictionary<T> {
 }
 
 export type RICConnEventArgs = {
-    url?: string;
+    ipAddress?: string;
     name?: string;
     ifType?: RICIFType;
     systemInfo?: RICSystemInfo;
@@ -271,6 +279,7 @@ export type RICConnEventArgs = {
 export enum RICEvent {
     CONNECTING_RIC,
     CONNECTING_RIC_FAIL,
+    CONNECTED_TRANSPORT_LAYER,
     CONNECTED_RIC,
     DISCONNECTED_RIC,
     SET_RIC_NAME_START,
@@ -288,12 +297,7 @@ export enum RICEvent {
     UPDATE_CANCELLING,
 };
 
-export type RICConnEventListener = (
-    eventType: RICEvent,
-    args?: RICConnEventArgs
-) => void;
-
-export type RICCmdParams = {[key: string]: number};
+export type RICCmdParams = { [key: string]: number };
 
 export type RICFetchBlobResult = {
     fileBytes: Uint8Array,
@@ -306,3 +310,16 @@ export type RICFetchBlobFnType = (
     filePath: string,
     progressCB: (received: number, total: number) => void,
 ) => RICFetchBlobResult | null;
+
+export type RICConnEventFn = (
+    eventType: RICEvent,
+    args?: RICConnEventArgs
+) => void;
+
+export interface RICEventIF {
+    onRxSmartServo(smartServos: ROSSerialSmartServos): void;
+    onRxIMU(imuData: ROSSerialIMU): void;
+    onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void;
+    onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
+    onConnEvent: RICConnEventFn;
+}
