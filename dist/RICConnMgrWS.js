@@ -68,7 +68,7 @@ export default class RICConnMgrWS {
      */
     connect(discoveredRIC) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("RICConnMgrWS: " + discoveredRIC.ipAddress);
+            // console.log("RICConnMgrWS: " + discoveredRIC.ipAddress);
             if (this._onStateChangeListener) {
                 this._onStateChangeListener(RICEvent.CONNECTING_RIC, {
                     ipAddress: discoveredRIC.ipAddress,

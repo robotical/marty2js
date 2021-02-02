@@ -148,7 +148,6 @@ export default class RICMsgHandler {
                         }
                     }
                     catch (excp) {
-                        console.log(`${restStr}`);
                         console.warn(`handleNewRxMsg Failed to parse JSON response ${excp}`);
                     }
                 }

@@ -142,7 +142,7 @@ export class Marty {
     // Mark: Constructor ---------------------------------------------------------------------------------------
 
     constructor() {
-        RICUtils.info('Marty connector starting up');
+        // RICUtils.info('Marty connector starting up');
 
         // Subscribe to connection state changes
         this._connManager.onStateChange((connEvent, connEventArgs) => {

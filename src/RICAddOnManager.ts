@@ -30,8 +30,6 @@ export default class RICAddOnManager {
   setHWElems(hwElems: Array<RICHWElem>) {
     this._addOnMap = this.getMappingOfAddOns(hwElems);
     console.log('AddonMap');
-    console.log(this._addOnMap);
-    console.log(hwElems);
   }
 
   clear() {
@@ -43,7 +41,6 @@ export default class RICAddOnManager {
     // Iterate HWElems to find addons
     for (const hwElem of hwElems) {
       if (hwElem.type === 'RSAddOn') {
-        console.log(hwElem);
         switch (parseInt(hwElem.whoAmITypeCode)) {
           case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
             addOnMap[hwElem.IDNo.toString()] = new RICAddOnGrabServo(hwElem.name);
