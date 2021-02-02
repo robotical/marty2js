@@ -32,6 +32,7 @@ export default class RICConnManager {
     async connect(discoveredRIC: DiscoveredRIC): Promise<boolean> {
         // TODO - may want to check if already connected to different interface
         //           and decide what to do in that case ...
+
         this._interfaceInUse = discoveredRIC._interface;
         if (discoveredRIC._interface === RICIFType.RIC_INTERFACE_BLE) {
             // TODO handle BLE

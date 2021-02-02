@@ -3,11 +3,15 @@ import { ROSSerialAddOnStatus } from './RICROSSerial.js';
 import RICUtils from './RICUtils.js';
 
 // RIC ADDON CODES
-export const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE = '0000008A';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT = '00000086';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR = '00000085';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT = '00000084';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE = '00000083';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE  = '00000083';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT     = '00000084';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR    = '00000085';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT    = '00000086';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT   = '00000087';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM    = '00000088';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE    = '00000089';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE     = '0000008A';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO = '0000008B';
 
 // Format definitions
 const ADDON_IRFOOT_FORMAT_DEF = {
@@ -170,6 +174,22 @@ export function getHWElemTypeStr(whoAmITypeCode: string | undefined) {
     return `Undefined whoamiTypeCode`;
   }
   switch (parseInt(whoAmITypeCode)) {
+
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
+      console.log("Found Grabber Arm");
+      return 'GripperArm';
+
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
+      //console.log("Found LED Foot");
+      return 'DiscoFoot';
+
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM):
+      //console.log("Found LED Arm");
+      return 'DiscoArm';
+
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE):
+      //console.log("Found LED Eye");
+      return 'DiscoEyes';
     case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT):
       return 'IRFoot';
 
@@ -205,6 +225,98 @@ export class RICAddOnBase {
     return new ROSSerialAddOnStatus();
   }
 }
+
+
+export class RICAddOnGrabServo extends RICAddOnBase {
+  constructor(name: string) {
+    super(name);
+    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO);
+  }
+  
+  processPublishedData(
+    addOnID: number,
+    statusByte: number,
+  ): ROSSerialAddOnStatus {
+    // Status to return
+    const retStatus = new ROSSerialAddOnStatus();
+
+    // console.log("RICADDONMANAGER: debugging info");
+
+    // Extract data
+    retStatus.id = addOnID;
+    retStatus.deviceTypeID = this._deviceTypeID;
+    retStatus.name = this._name;
+    retStatus.status = statusByte;
+    return retStatus;
+  }
+}
+
+export class RICAddOnLEDFoot extends RICAddOnBase {
+  constructor(name: string) {
+    super(name);
+    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT);
+  }
+  processPublishedData(
+    addOnID: number,
+    statusByte: number,
+  ): ROSSerialAddOnStatus {
+    // Status to return
+    const retStatus = new ROSSerialAddOnStatus();
+
+    // console.log("RICADDONMANAGER: debugging info");
+
+    // Extract data
+    retStatus.id = addOnID;
+    retStatus.deviceTypeID = this._deviceTypeID;
+    retStatus.name = this._name;
+    retStatus.status = statusByte;
+    return retStatus;
+  }
+}
+
+export class RICAddOnLEDArm extends RICAddOnBase {
+  constructor(name: string) {
+    super(name);
+    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM);
+  }
+  processPublishedData(
+    addOnID: number,
+    statusByte: number,
+  ): ROSSerialAddOnStatus {
+    // Status to return
+    const retStatus = new ROSSerialAddOnStatus();
+
+    // Extract data
+    retStatus.id = addOnID;
+    retStatus.deviceTypeID = this._deviceTypeID;
+    retStatus.name = this._name;
+    retStatus.status = statusByte;
+    return retStatus;
+  }
+}
+
+export class RICAddOnLEDEye extends RICAddOnBase {
+  constructor(name: string) {
+    super(name);
+    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE);
+  }
+  processPublishedData(
+    addOnID: number,
+    statusByte: number,
+  ): ROSSerialAddOnStatus {
+    // Status to return
+    const retStatus = new ROSSerialAddOnStatus();
+
+    // Extract data
+    retStatus.id = addOnID;
+    retStatus.deviceTypeID = this._deviceTypeID;
+    retStatus.name = this._name;
+    retStatus.status = statusByte;
+    return retStatus;
+  }
+}
+
+
 
 export class RICAddOnIRFoot extends RICAddOnBase {
   _dataExtractor: DataExtractor;

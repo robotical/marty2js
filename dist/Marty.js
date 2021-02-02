@@ -34,7 +34,6 @@ import RICUtils from './RICUtils.js';
 export class Marty {
     // Mark: Constructor ---------------------------------------------------------------------------------------
     constructor() {
-        // RICUtils.info('Marty connector starting up');
         // Event callbakcs
         this._ricEventListener = null;
         // System info
@@ -95,6 +94,7 @@ export class Marty {
         this.TEST_PRETEND_ELEM_UPDATE_REQD = false;
         this.TEST_PRETEND_INITIAL_VERSIONS_DIFFER = false;
         this.TEST_PRETEND_FINAL_VERSIONS_MATCH = false;
+        RICUtils.info('Marty connector starting up');
         // Subscribe to connection state changes
         this._connManager.onStateChange((connEvent, connEventArgs) => {
             this._onConnStateChange(connEvent, connEventArgs);
@@ -405,7 +405,9 @@ export class Marty {
      */
     getHWElemList() {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log("[DEBUG]: About to try to grab HW List");
             try {
+                console.log("[DEBUG]: Trying to grab HW List");
                 const ricHWList = yield this._ricMsgHandler.sendRICRESTURL('hwstatus', true);
                 RICUtils.debug('getHWElemList returned ' + JSON.stringify(ricHWList));
                 this._hwElems = ricHWList.hw;

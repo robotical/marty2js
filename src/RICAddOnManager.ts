@@ -1,6 +1,14 @@
 import { Dictionary, RICHWElem } from './RICTypes.js';
 import {
   RICAddOnBase,
+  RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO,
+  RICAddOnGrabServo,
+  RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT,
+  RICAddOnLEDFoot,
+  RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM,
+  RICAddOnLEDArm,
+  RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE,
+  RICAddOnLEDEye,
   RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT,
   RICAddOnIRFoot,
   RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR,
@@ -21,6 +29,9 @@ export default class RICAddOnManager {
 
   setHWElems(hwElems: Array<RICHWElem>) {
     this._addOnMap = this.getMappingOfAddOns(hwElems);
+    console.log('AddonMap');
+    console.log(this._addOnMap);
+    console.log(hwElems);
   }
 
   clear() {
@@ -32,7 +43,20 @@ export default class RICAddOnManager {
     // Iterate HWElems to find addons
     for (const hwElem of hwElems) {
       if (hwElem.type === 'RSAddOn') {
+        console.log(hwElem);
         switch (parseInt(hwElem.whoAmITypeCode)) {
+          case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
+            addOnMap[hwElem.IDNo.toString()] = new RICAddOnGrabServo(hwElem.name);
+            break;
+          case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
+            addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDFoot(hwElem.name);
+            break;
+          case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM):
+            addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDArm(hwElem.name);
+            break;
+          case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE):
+            addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDEye(hwElem.name);
+            break;
           case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT):
             addOnMap[hwElem.IDNo.toString()] = new RICAddOnIRFoot(hwElem.name);
             break;

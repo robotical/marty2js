@@ -142,7 +142,7 @@ export class Marty {
     // Mark: Constructor ---------------------------------------------------------------------------------------
 
     constructor() {
-        // RICUtils.info('Marty connector starting up');
+        RICUtils.info('Marty connector starting up');
 
         // Subscribe to connection state changes
         this._connManager.onStateChange((connEvent, connEventArgs) => {
@@ -468,7 +468,9 @@ export class Marty {
      *
      */
     async getHWElemList(): Promise<RICHWElemList> {
+        console.log("[DEBUG]: About to try to grab HW List");
         try {
+            console.log("[DEBUG]: Trying to grab HW List");
             const ricHWList = await this._ricMsgHandler.sendRICRESTURL<RICHWElemList>(
                 'hwstatus',
                 true,
