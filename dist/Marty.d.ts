@@ -137,13 +137,13 @@ export declare class Marty {
     runTrajectory(trajName: string, params: RICCmdParams): Promise<RICOKFail>;
     /**
      *
-     * runTrajectory
-     * @param commandName command API string
-     * @param params parameters (simple name value pairs only) to parameterize trajectory
+     * runCommand
+     * @param restCmdOrJsonCmd command REST API string OR JSON command string
+     * @param params parameters (simple name value pairs only) to parameterize command (e.g. trajectory parameters)
      * @returns Promise<RICOKFail>
      *
      */
-    runCommand(commandName: string, params: RICCmdParams): Promise<RICOKFail>;
+    runCommand(restCmdOrJsonCmd: string, params: RICCmdParams): Promise<RICOKFail>;
     /**
      *
      * hwElemFirmwareUpdate - initiate firmware update of one or more HWElems

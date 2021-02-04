@@ -1,0 +1,1165 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// RICConnector
+// Communications Connector for RIC V2
+//
+// RIC V2
+// Rob Dobson & Chris Greening 2020
+// (C) Robotical 2020
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import axios from 'axios';
+import { EventEmitter } from 'events';
+import RICUtils from './RICUtils';
+import semverEq from 'semver/functions/eq';
+import {
+  SCANNING_STARTED,
+  SCANNING_FINISHED,
+  VERIFYING_CORRECT_RIC,
+  CONNECTING_RIC,
+  CONNECTED_RIC,
+  DISCONNECTED_RIC,
+  RIC_REJECTED,
+  VERIFIED_CORRECT_RIC,
+  VERIFIED_CORRECT_RIC_PENDING,
+  CONNECTING_RIC_FAIL,
+  SET_RIC_NAME_START,
+  SET_RIC_NAME_SUCCESS,
+  SET_RIC_NAME_FAILED,
+  UPDATE_CANT_REACH_SERVER,
+  UPDATE_IS_AVAILABLE,
+  UPDATE_NOT_AVAILABLE,
+  UPDATE_FAILED,
+  UPDATE_SUCCESS_ALL,
+  UPDATE_SUCCESS_MAIN_ONLY,
+  UPDATE_PROGRESS,
+  UPDATE_STARTED,
+  UPDATE_CANCELLING,
+  BLUETOOTH_STATE,
+  SET_CALIBRATION_FLAG,
+} from '../../redux/actions/types';
+import semverGt from 'semver/functions/gt';
+import RICMsgHandler, { MessageResultCode } from './RICMsgHandler';
+import {
+  ROSSerialSmartServos,
+  ROSSerialIMU,
+  ROSSerialPowerStatus,
+  ROSSerialAddOnStatusList,
+} from './RICROSSerial';
+import {
+  RICDiscoveryListener,
+  DiscoveredRIC,
+  DiscoveryInterfaces,
+  RICFileSendType,
+  RICSystemInfo,
+  RICFriendlyName,
+  RICNameResponse,
+  RICStateInfo,
+  RICUpdateInfo,
+  RICOKFail,
+  RICHWFWUpdRslt,
+  RICFileList,
+  RICCalibInfo,
+  RICHWElemList,
+  RICAddOnList,
+  RICHWElem,
+  RICSubscription,
+  RICIFType,
+} from './RICTypes';
+import RICFileHandler from './RICFileHandler';
+import RNFetchBlob from 'rn-fetch-blob';
+import CommsStats from './CommsStats';
+import RICAddOnManager from './RICAddOnManager';
+import RICConnManager from './RICConnManager';
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// RICConnector Class
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export default class RICConnector extends EventEmitter {
+
+  // Connection manager
+  _connManager: RICConnManager = null;
+
+  // System info
+  _systemInfo: RICSystemInfo | null = null;
+
+  // Update info
+  _lastestVersionInfo: RICUpdateInfo | null = null;
+  _updateESPRequired = false;
+  _updateElemsRequired = false;
+
+  // RIC friendly name
+  _ricFriendlyName: string | null = null;
+  _ricFriendlyNameIsSet = false;
+
+  // Calibration info
+  _calibInfo: RICCalibInfo | null = null;
+
+  // HWElems (connected to RIC)
+  _hwElems: Array<RICHWElem> = new Array<RICHWElem>();
+
+  // Add-on Manager
+  _addOnManager = new RICAddOnManager();
+
+  // Listener for state changes
+  _discoveryListener: RICDiscoveryListener | null = null;
+
+  // Connection
+  _connSubscrOnRx: RICSubscription | null = null;
+  _connSubscrOnDisconnect: RICSubscription | null = null;
+  _connSubscrOnStateChange: RICSubscription | null = null;
+
+  // Progress bar
+  _progressAfterDownload = 0.1;
+  _progressAfterUpload = 0.9;
+  _progressAfterRestart = 0.93;
+
+  // Comms stats
+  _commsStats: CommsStats = new CommsStats();
+
+  // Message handler
+  _ricMsgHandler: RICMsgHandler = new RICMsgHandler(
+    this._commsStats,
+    this._addOnManager,
+  );
+
+  // File handler
+  _ricFileHandler: RICFileHandler = new RICFileHandler(
+    this._ricMsgHandler,
+    this._commsStats,
+  );
+
+  // Latest data from servos, IMU, etc
+  _ricStateInfo: RICStateInfo = new RICStateInfo();
+
+  // Joint names
+  _jointNames = {
+    LeftHip: 'LeftHip',
+    LeftTwist: 'LeftTwist',
+    LeftKnee: 'LeftKnee',
+    RightHip: 'RightHip',
+    RightTwist: 'RightTwist',
+    RightKnee: 'RightKnee',
+    LeftArm: 'LeftArm',
+    RightArm: 'RightArm',
+    Eyes: 'Eyes',
+  };
+
+  // FW update
+  FW_UPDATE_CHECKS_BEFORE_ASSUME_FAILED = 10;
+  FIRMWARE_TYPE_FOR_MAIN_ESP32_FW = 'main';
+  NON_FIRMWARE_ELEM_TYPES = ['sound', 'traj'];
+  ELEM_FW_CHECK_LOOPS = 36;
+
+  // TESTS - set to true for testing OTA updates ONLY
+  TEST_TRUNCATE_ESP_FILE = false;
+  TEST_PRETEND_ELEM_UPDATE_REQD = false;
+  TEST_PRETEND_INITIAL_VERSIONS_DIFFER = false;
+  TEST_PRETEND_FINAL_VERSIONS_MATCH = false;
+
+  // Mark: Constructor ---------------------------------------------------------------------------------------
+
+  constructor() {
+    super();
+    console.log('Starting up');
+
+    // Construct connection manager
+    this._connManager = new RICConnManager(this._ricMsgHandler);
+
+    // Subscribe to connection state changes
+    this._connManager.onStateChange((ifType, newConnState) => {
+      this._onConnStateChange(ifType, newConnState);
+    });
+
+    // Message handling in and out
+    this._ricMsgHandler.registerForResults(this);
+    this._ricMsgHandler.registerMsgSender(this);
+    this._ricFileHandler.registerMsgSender(this);
+  }
+
+  // Mark: Connection State Change -----------------------------------------------------------------------------------------
+
+  async _onConnStateChange(ifType: RICIFType, stateChangeStr: string): Promise<void> {
+    console.log('Conn state change ' +
+      (ifType === RICIFType.RIC_INTERFACE_BLE ? "BLE" : "WS") + " change str " +
+      stateChangeStr);
+    if (stateChangeStr === "disconnected") {
+      this._systemInfo = null;
+      this._hwElems = new Array<RICHWElem>();
+      this._addOnManager.clear();
+      this._calibInfo = null;
+      this._ricFriendlyName = null;
+      this._ricFriendlyNameIsSet = false;
+    } else if (stateChangeStr === "connected") {
+      // Get system info
+      try {
+        this._systemInfo = await this.getRICSystemInfo();
+        console.log(
+          `verificationStop - RIC Version ${this._systemInfo.SystemVersion}`,
+        );
+      } catch (error) {
+        console.log('verificationStop - failed to get version ' + error);
+      }
+
+      // Get RIC name
+      try {
+        await this.getRICName();
+      } catch (error) {
+        console.log('verificationStop - failed to get RIC name ' + error);
+      }
+
+      // Get calibration info
+      try {
+        this._calibInfo = await this.getRICCalibInfo();
+      } catch (error) {
+        console.log('verificationStop - failed to get calib info ' + error);
+      }
+
+      // Get HWElems (connected to RIC)
+      try {
+        await this.getHWElemList();
+      } catch (error) {
+        console.log('verificationStop - failed to get HWElems ' + error);
+      }
+
+      // RIC verified and connected
+      this.emit(VERIFIED_CORRECT_RIC, { systemInfo: this._systemInfo });
+
+    }
+  }
+
+  // Mark: Connection -----------------------------------------------------------------------------------------
+
+  /**
+   * Connect to a RIC
+   *
+   * @returns None
+   *
+   */
+  async connect(discoveredRIC: DiscoveredRIC): Promise<boolean> {
+    // Request connection
+    return await this._connManager.connect(discoveredRIC);
+  }
+
+  /**
+   * Disconnect from RIC
+   *
+   * @returns None
+   *
+   */
+  async disconnect(): Promise<void> {
+
+    // Request disconnection
+    await this._connManager.disconnect();
+
+    // Emit disconnected event
+    this.emit(DISCONNECTED_RIC, {});
+    console.log('disconnected');
+  }
+
+  // Mark: Robot Control ------------------------------------------------------------------------------------
+
+  /**
+   *
+   * Robot Control
+   * @param arg 'stop', 'stopAfterMove', 'panic', 'pause', 'resume'
+   * @returns Promise<boolean> true for success
+   *
+   */
+  async robotControl(arg: string): Promise<RICOKFail> {
+    try {
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        'robot/' + arg,
+        true,
+      );
+    } catch (error) {
+      console.log('robotControl failed ', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: Power Control ------------------------------------------------------------------------------------
+
+  /**
+   *
+   * Power Control
+   * @param arg '5von', '5voff', 'off'
+   * @returns Promise<boolean> true for success
+   *
+   */
+  async powerControl(arg: string): Promise<RICOKFail> {
+    try {
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        'pwrctrl/' + arg,
+        true,
+      );
+    } catch (error) {
+      console.log('powerControl failed ', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: File Run ------------------------------------------------------------------------------------
+
+  /**
+   *
+   * File Run
+   * @param fileName name of file to run including extension (can start 'sd~' or 'spiffs~' to define
+   *                 file system location of the file
+   * @returns Promise<boolean> true for success
+   *
+   */
+  async fileRun(fileName: string): Promise<RICOKFail> {
+    try {
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        'filerun/' + fileName,
+        true,
+      );
+    } catch (error) {
+      console.log('fileRun failed ', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: RIC Naming -----------------------------------------------------------------------------------
+
+  /**
+   *
+   * setRICName
+   * @param newName name to refer to RIC - used for BLE advertising
+   * @returns Promise<string> (name that has been set)
+   *
+   */
+  async setRICName(newName: string): Promise<string> {
+    this.emit(SET_RIC_NAME_START);
+    try {
+      const msgRsltJsonObj = await this._ricMsgHandler.sendRICRESTURL<
+        RICFriendlyName
+      >(`friendlyname/${newName}`, true);
+
+      const nameThatHasBeenSet = msgRsltJsonObj.friendlyName;
+      this._ricFriendlyName = nameThatHasBeenSet;
+      this._ricFriendlyNameIsSet = true;
+      this.emit(SET_RIC_NAME_SUCCESS, { newName: nameThatHasBeenSet });
+      return nameThatHasBeenSet;
+    } catch (error) {
+      this.emit(SET_RIC_NAME_FAILED);
+      return '';
+    }
+  }
+
+  /**
+   *
+   * getRICName
+   * @returns Promise<RICNameResponse> (object containing rslt)
+   *
+   */
+  async getRICName(): Promise<RICNameResponse> {
+    try {
+      const msgRsltJsonObj = await this._ricMsgHandler.sendRICRESTURL<
+        RICNameResponse
+      >('friendlyname', true);
+      if (msgRsltJsonObj.rslt === 'ok') {
+        this._ricFriendlyName = msgRsltJsonObj.friendlyName;
+        this._ricFriendlyNameIsSet = msgRsltJsonObj.friendlyNameIsSet != 0;
+      }
+      return msgRsltJsonObj;
+    } catch (error) {
+      return new RICNameResponse();
+    }
+  }
+
+  // Mark: RIC System Info --------------------------------------------------------------------------------
+
+  /**
+   *
+   * getRICSystemInfo
+   * @returns Promise<RICSystemInfo>
+   *
+   */
+  async getRICSystemInfo(): Promise<RICSystemInfo> {
+    try {
+      const ricSystemInfo = await this._ricMsgHandler.sendRICRESTURL<
+        RICSystemInfo
+      >('v', true);
+      console.log('getRICSystemInfo returned ' + ricSystemInfo);
+      return ricSystemInfo;
+    } catch (error) {
+      console.log('getRICSystemInfo Failed to get version', error);
+      return new RICSystemInfo();
+    }
+  }
+
+  // Mark: RIC Calibration Info --------------------------------------------------------------------------------
+
+  /**
+   *
+   * getRICCalibInfo
+   * @returns Promise<RICCalibInfo>
+   *
+   */
+  async getRICCalibInfo(): Promise<RICCalibInfo> {
+    try {
+      const ricCalibInfo = await this._ricMsgHandler.sendRICRESTURL<
+        RICCalibInfo
+      >('calibrate', true);
+      console.log('getRICCalibInfo returned ' + ricCalibInfo);
+      return ricCalibInfo;
+    } catch (error) {
+      console.log('getRICCalibInfo Failed to get version', error);
+      return new RICCalibInfo();
+    }
+  }
+
+  // Mark: Run Trajectory --------------------------------------------------------------------------------
+
+  /**
+   *
+   * runTrajectory
+   * @param trajName name of trajectory
+   * @param params parameters (simple name value pairs only) to parameterize trajectory
+   * @returns Promise<RICOKFail>
+   *
+   */
+  async runTrajectory(trajName: string, params: object): Promise<RICOKFail> {
+    try {
+      // Format the paramList as query string
+      const paramEntries = this._objectEntries(params);
+      let paramQueryStr = '';
+      for (const param of paramEntries) {
+        if (paramQueryStr.length > 0) paramQueryStr += '&';
+        paramQueryStr += param[0] + '=' + param[1];
+      }
+      // Format the url to send
+      let cmdUrl = 'traj/' + trajName;
+      if (paramQueryStr.length > 0) cmdUrl += '?' + paramQueryStr;
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(cmdUrl, true);
+    } catch (error) {
+      console.log('runTrajectory failed', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: Run API Command -------------------------------------------------------------------------------
+
+  /**
+   *
+   * runTrajectory
+   * @param commandName command API string
+   * @param params parameters (simple name value pairs only) to parameterize trajectory
+   * @returns Promise<RICOKFail>
+   *
+   */
+  async runCommand(commandName: string, params: object): Promise<RICOKFail> {
+    try {
+      // Format the paramList as query string
+      const paramEntries = this._objectEntries(params);
+      let paramQueryStr = '';
+      for (const param of paramEntries) {
+        if (paramQueryStr.length > 0) paramQueryStr += '&';
+        paramQueryStr += param[0] + '=' + param[1];
+      }
+      // Format the url to send
+      if (paramQueryStr.length > 0) commandName += '?' + paramQueryStr;
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        commandName,
+        true,
+      );
+    } catch (error) {
+      console.log('runCommand failed', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: Firmware update of hardware element(s) -----------------------------------------------------------
+
+  /**
+   *
+   * hwElemFirmwareUpdate - initiate firmware update of one or more HWElems
+   * @returns Promise<RICOKFail>
+   *
+   */
+  async hwElemFirmwareUpdate(): Promise<RICOKFail> {
+    try {
+      return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        'hwfwupd',
+        true,
+      );
+    } catch (error) {
+      console.log('hwElemFirmwareUpdate get status failed', error);
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: Get HWElem list -----------------------------------------------------------
+
+  /**
+   *
+   * getHWElemList - get list of HWElems on the robot (including add-ons)
+   * @returns Promise<RICHWElemList>
+   *
+   */
+  async getHWElemList(): Promise<RICHWElemList> {
+    try {
+      const ricHWList = await this._ricMsgHandler.sendRICRESTURL<RICHWElemList>(
+        'hwstatus',
+        true,
+      );
+      console.log('getHWElemList returned ' + JSON.stringify(ricHWList));
+      this._hwElems = ricHWList.hw;
+      this._addOnManager.setHWElems(this._hwElems);
+      return ricHWList;
+    } catch (error) {
+      console.log('getHWElemList Failed to get list of HWElems', error);
+      return new RICHWElemList();
+    }
+  }
+
+  // Mark: Set AddOn config -----------------------------------------------------------
+
+  /**
+   *
+   * setAddOnConfig - set a specified add-on's configuration
+   * @param serialNo used to identify the add-on
+   * @param newName name to refer to add-on by
+   * @returns Promise<RICOKFail>
+   *
+   */
+  async setAddOnConfig(serialNo: string, newName: string): Promise<RICOKFail> {
+    try {
+      const msgRslt = await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+        `addon/set?SN=${serialNo}&name=${newName}`,
+        true,
+      );
+      return msgRslt;
+    } catch (error) {
+      return new RICOKFail();
+    }
+  }
+
+  // Mark: Get AddOn list -----------------------------------------------------------
+
+  /**
+   *
+   * getAddOnList - get list of add-ons configured on the robot
+   * @returns Promise<RICAddOnList>
+   *
+   */
+  async getAddOnList(): Promise<RICAddOnList> {
+    try {
+      const addOnList = await this._ricMsgHandler.sendRICRESTURL<RICAddOnList>(
+        'addon/list',
+        true,
+      );
+      console.log('getAddOnList returned ' + addOnList);
+      return addOnList;
+    } catch (error) {
+      console.log('getAddOnList Failed to get list of add-ons', error);
+      return new RICAddOnList();
+    }
+  }
+
+  // Mark: Get file list -----------------------------------------------------------
+
+  /**
+   *
+   * getFileList - get list of files on file system
+   * @returns Promise<RICFileList>
+   *
+   */
+  async getFileList(): Promise<RICFileList> {
+    try {
+      const ricFileList = await this._ricMsgHandler.sendRICRESTURL<RICFileList>(
+        'filelist',
+        true,
+      );
+      console.log('getFileList returned ' + ricFileList);
+      return ricFileList;
+    } catch (error) {
+      console.log('getFileList Failed to get file list', error);
+      return new RICFileList();
+    }
+  }
+
+  // Mark: File Transfer ------------------------------------------------------------------------------------
+
+  /**
+   *
+   * fileSend - start file transfer
+   * @param fileName name of file to send
+   * @param fileType normal file or firmware
+   * @param fileContents contenst of the file (binary object)
+   * @returns Promise<boolean>
+   *
+   */
+  async fileSend(
+    fileName: string,
+    fileType: RICFileSendType,
+    fileContents: Uint8Array,
+    progressCallback: (sent: number, total: number, progress: number) => void,
+  ): Promise<boolean> {
+    if (this._connManager.isConnected()) {
+      return false;
+    }
+    return await this._ricFileHandler.fileSend(
+      fileName,
+      fileType,
+      fileContents,
+      progressCallback,
+    );
+  }
+
+  fileSendCancel() {
+    return this._ricFileHandler.fileSendCancel();
+  }
+
+  // Mark: Calibration -----------------------------------------------------------------------------------------
+
+  async calibrate(cmd: string, joints: string) {
+    let overallResult = true;
+    if (cmd === 'set') {
+      // Make a list of joints to set calibration on
+      const jointList: Array<string> = new Array<string>();
+      if (joints === 'legs') {
+        jointList.push(this._jointNames.LeftHip);
+        jointList.push(this._jointNames.LeftTwist);
+        jointList.push(this._jointNames.LeftKnee);
+        jointList.push(this._jointNames.RightHip);
+        jointList.push(this._jointNames.RightTwist);
+        jointList.push(this._jointNames.RightKnee);
+      } else if (joints === 'arms') {
+        jointList.push(this._jointNames.LeftArm);
+        jointList.push(this._jointNames.RightArm);
+      }
+      if (joints === 'eyes') {
+        jointList.push(this._jointNames.Eyes);
+      }
+
+      // Set calibration
+      for (const jnt of jointList) {
+        try {
+          // Set calibration on joint
+          const cmdUrl = 'calibrate/set/' + jnt;
+          const rslt = await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+            cmdUrl,
+            true,
+          );
+          if (rslt.rslt != 'ok') overallResult = false;
+        } catch (error) {
+          console.log(`calibrate failed on joint ${jnt}`, error);
+        }
+
+        // Wait as writing to flash blocks servo access
+        // as of v0.0.113 of firmware, the pause is no longer required
+        //await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+
+      // ensure all joints are enabled
+      for (const jnt in this._jointNames) {
+        try {
+          // enable joint
+          const cmdUrl = 'servo/' + jnt + '/enable/1';
+          const rslt = await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+            cmdUrl,
+            true,
+          );
+          if (rslt.rslt != 'ok') overallResult = false;
+        } catch (error) {
+          console.log(`enable failed on joint ${jnt}`, error);
+        }
+      }
+
+      // Result
+      console.log('Set calibration flag to true');
+      this.emit(SET_CALIBRATION_FLAG);
+      const rslt = new RICOKFail();
+      rslt.set(overallResult);
+      return rslt;
+    }
+  }
+
+  // Mark: Cached variable access ------------------------------------------------------------------------------------------
+
+  getCachedSystemInfo(): RICSystemInfo | null {
+    return this._systemInfo;
+  }
+
+  getCachedHWElemList(): Array<RICHWElem> {
+    return this._hwElems;
+  }
+
+  getCachedCalibInfo(): RICCalibInfo | null {
+    return this._calibInfo;
+  }
+
+  getCachedRICName(): string | null {
+    return this._ricFriendlyName;
+  }
+
+  getCachedRICNameIsSet(): boolean {
+    return this._ricFriendlyNameIsSet;
+  }
+
+  // Mark: Check firmware versions------------------------------------------------------------------------------------------
+
+  async checkForUpdate() {
+    this._lastestVersionInfo = null;
+    try {
+      const response = await axios.get(
+        'https://updates.robotical.io/marty2/current_version.json',
+      );
+      this._lastestVersionInfo = response.data;
+    } catch (error) {
+      console.log('checkForUpdate failed to get latest from internet');
+      this.emit(UPDATE_CANT_REACH_SERVER);
+    }
+    if (this._lastestVersionInfo === null) return;
+
+    // Get RIC version
+    if (!this._connManager.isConnected()) return;
+    try {
+      this._systemInfo = await this.getRICSystemInfo();
+      console.log(
+        `checkForUpdate RIC Version ${this._systemInfo.SystemVersion}`,
+      );
+    } catch (error) {
+      console.log('checkForUpdate - failed to get version ' + error);
+      return;
+    }
+
+    // Check the version and incomplete previous hw-elem update if needed
+    try {
+      const updateRequired = await this._isUpdateRequired(
+        this._lastestVersionInfo,
+        this._systemInfo,
+      );
+      console.log(
+        'checkForUpdate systemVersion',
+        this._systemInfo?.SystemVersion,
+        'available online',
+        this._lastestVersionInfo?.main.version,
+        'updateRequired',
+        updateRequired,
+      );
+      if (updateRequired) {
+        this.emit(UPDATE_IS_AVAILABLE);
+      } else {
+        this.emit(UPDATE_NOT_AVAILABLE);
+      }
+    } catch (error) {
+      console.log('Failed to get latest version from internet');
+      this.emit(UPDATE_CANT_REACH_SERVER);
+      return;
+    }
+  }
+
+  async _isUpdateRequired(
+    latestVersion: RICUpdateInfo,
+    systemInfo: RICSystemInfo | null,
+  ): Promise<boolean> {
+    this._updateESPRequired = false;
+    this._updateElemsRequired = false;
+    if (systemInfo === null) {
+      this.emit(UPDATE_NOT_AVAILABLE);
+      return false;
+    }
+
+    // Perform the version check
+    this._updateESPRequired = semverGt(
+      latestVersion.main.version,
+      systemInfo.SystemVersion,
+    );
+
+    // Test ONLY pretend an update is needed
+    if (this.TEST_PRETEND_INITIAL_VERSIONS_DIFFER) {
+      this._updateESPRequired = true;
+    }
+
+    // Check if a previous hw-elem update didn't complete - but no point if we would update anyway
+    if (!this._updateESPRequired) {
+      try {
+        const elUpdRslt = await this._ricMsgHandler.sendRICRESTURL<
+          RICHWFWUpdRslt
+        >('hwfwupd', true);
+
+        // Check result
+        this._updateElemsRequired =
+          elUpdRslt.rslt === 'ok' && elUpdRslt.st.i === 1;
+
+        // Debug
+        if (this._updateElemsRequired) {
+          console.log('isUpdateRequired - prev incomplete');
+        } else {
+          console.log('isUpdateRequired - prev complete');
+        }
+
+        // Test ONLY pretend an element update is needed
+        if (this.TEST_PRETEND_ELEM_UPDATE_REQD) {
+          this._updateElemsRequired = true;
+        }
+      } catch (error) {
+        console.log(
+          'isUpdateRequired failed to get hw-elem firmware update status',
+        );
+      }
+    } else {
+      this._updateElemsRequired = true;
+    }
+    return this._updateESPRequired || this._updateElemsRequired;
+  }
+
+  // Mark: Firmware udpate ------------------------------------------------------------------------------------------------
+
+  async firmwareUpdate() {
+    // Check valid
+    if (this._lastestVersionInfo === null) return;
+
+    // Update started
+    this.emit(UPDATE_STARTED);
+    this.emit(UPDATE_PROGRESS, { stage: 'Downloading firmware', progress: 0 });
+
+    // Make a list of firmware entities - starting with the hw-elems
+    const firmwareList = [...this._lastestVersionInfo.addons];
+
+    // Add the main firware if it is required
+    if (this._updateESPRequired) {
+      const mainFwInfo = this._lastestVersionInfo.main;
+      firmwareList.push(mainFwInfo);
+    }
+
+    // Binary data downloaded from the internet
+    const firmwareData = new Array<Uint8Array>();
+
+    // Iterate through the firmware entities
+    const numFw = firmwareList.length;
+    try {
+      for (let fwIdx = 0; fwIdx < firmwareList.length; fwIdx++) {
+        // Download the firmware
+        console.log(`Downloading file URI ${firmwareList[fwIdx].firmware}`);
+        const res = await RNFetchBlob.config({
+          fileCache: true,
+          appendExt: 'bin',
+        })
+          .fetch('GET', firmwareList[fwIdx].firmware)
+          .progress((received: number, total: number) => {
+            // console.log(`${received} ${total}`);
+            const currentProgress =
+              ((fwIdx + received / total) / numFw) *
+              this._progressAfterDownload;
+            this.emit(UPDATE_PROGRESS, {
+              stage: 'Downloading firmware',
+              progress: currentProgress,
+            });
+          });
+        if (res) {
+          const base64Enc = await res.base64();
+          const fileBytes = RICUtils.atob(base64Enc);
+          if (fileBytes) {
+            firmwareData.push(fileBytes);
+          } else {
+            throw Error('atob failed on file data');
+          }
+          // clean up file
+          res.flush();
+        } else {
+          this.emit(UPDATE_FAILED);
+          throw Error('file download res null');
+        }
+      }
+    } catch (error) {
+      console.log(error);
+      this.emit(UPDATE_FAILED, error);
+      return;
+    }
+
+    // Test ONLY truncate the main firmware
+    if (this._updateESPRequired && this.TEST_TRUNCATE_ESP_FILE) {
+      firmwareData[firmwareData.length - 1] = new Uint8Array(500);
+    }
+
+    // Calculate total length of data
+    let totalBytes = 0;
+    for (const fileData of firmwareData) {
+      totalBytes += fileData.length;
+    }
+
+    // Debug
+    console.log(
+      `Got ok ${firmwareData.length} files total ${totalBytes} bytes`,
+    );
+
+    // Start uploading
+    this.emit(UPDATE_PROGRESS, {
+      stage: 'Starting firmware upload',
+      progress: this._progressAfterDownload,
+    });
+
+    // Upload each file
+    try {
+      let sentBytes = 0;
+      for (let fwIdx = 0; fwIdx < firmwareData.length; fwIdx++) {
+        console.log(
+          `Uploading file name ${firmwareList[fwIdx].destname} len ${firmwareData[fwIdx].length}`,
+        );
+        await this.fileSend(
+          firmwareList[fwIdx].destname,
+          firmwareList[fwIdx].elemType === this.FIRMWARE_TYPE_FOR_MAIN_ESP32_FW
+            ? RICFileSendType.RIC_FIRMWARE_UPDATE
+            : RICFileSendType.RIC_NORMAL_FILE,
+          firmwareData[fwIdx],
+          (_, __, progress) => {
+            let percComplete =
+              ((sentBytes + progress * firmwareData[fwIdx].length) /
+                totalBytes) *
+              (this._progressAfterUpload - this._progressAfterDownload) +
+              this._progressAfterDownload;
+            if (percComplete > 1.0) percComplete = 1.0;
+            console.log(
+              `progress ${progress.toFixed(2)} sent ${sentBytes} len ${firmwareData[fwIdx].length
+              }`,
+              `total ${totalBytes} afterDownload ${this._progressAfterDownload
+              } propComplete ${percComplete.toFixed(2)}`,
+            );
+            this.emit(UPDATE_PROGRESS, {
+              stage:
+                'Uploading new firmware\nThis may take a while, please be patient',
+              progress: percComplete,
+            });
+          },
+        );
+        sentBytes += firmwareData[fwIdx].length;
+      }
+    } catch (error) {
+      console.log(error);
+      this.emit(UPDATE_FAILED);
+      return;
+    }
+
+    // If we did an ESP32 update
+    if (this._updateESPRequired) {
+      // Wait for firmware update to complete, restart to occur
+      // and BLE reconnection to happen
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const percComplete =
+          this._progressAfterUpload +
+          ((this._progressAfterRestart - this._progressAfterUpload) * i) / 3;
+        this.emit(UPDATE_PROGRESS, {
+          stage: 'Restarting Marty',
+          progress: percComplete,
+        });
+        console.log('fwUpdate waiting for reset');
+      }
+
+      // Attempt to get status from main ESP32 update
+      // The ESP32 will power cycle at this point so we need to wait a while
+      let firmwareUpdateConfirmed = false;
+      for (
+        let fwUpdateCheckCount = 0;
+        fwUpdateCheckCount < this.FW_UPDATE_CHECKS_BEFORE_ASSUME_FAILED;
+        fwUpdateCheckCount++
+      ) {
+        try {
+          // Get version
+          console.log(
+            'fwUpdate Attempting to get RIC version attempt',
+            fwUpdateCheckCount,
+          );
+          this._systemInfo = await this.getRICSystemInfo();
+          console.log(
+            `fwUpdate version rslt "${this._systemInfo.rslt}" RIC Version ${this._systemInfo.SystemVersion}`,
+          );
+          if (this._systemInfo.rslt !== 'ok') {
+            continue;
+          }
+
+          // Check version
+          firmwareUpdateConfirmed = semverEq(
+            this._lastestVersionInfo?.main.version,
+            this._systemInfo.SystemVersion,
+          );
+          console.log(`fwUpdate got version rslt ${firmwareUpdateConfirmed}`);
+
+          // Test fiddle to say it worked!
+          if (this.TEST_PRETEND_FINAL_VERSIONS_MATCH) {
+            firmwareUpdateConfirmed = true;
+          }
+          break;
+        } catch (error) {
+          console.log(
+            'fwUpdate - failed to get version attempt',
+            fwUpdateCheckCount,
+            'error',
+            error,
+          );
+        }
+      }
+
+      // Check if we're confirmed successful
+      if (!firmwareUpdateConfirmed) {
+        this.emit(UPDATE_FAILED);
+        return;
+      }
+    }
+
+    // Issue requests for hw-elem firmware updates
+    let elemFwIdx = 0;
+    let allElemsUpdatedOk = true;
+    for (const elemFw of firmwareList) {
+      // Update progress
+      const percComplete =
+        this._progressAfterRestart +
+        ((1 - this._progressAfterRestart) * elemFwIdx) / firmwareList.length;
+      this.emit(UPDATE_PROGRESS, {
+        stage: 'Updating elements',
+        progress: percComplete,
+      });
+      elemFwIdx++;
+
+      // Check element is not main
+      if (elemFw.elemType === this.FIRMWARE_TYPE_FOR_MAIN_ESP32_FW) continue;
+
+      // Non-firmware elemTypes
+      if (this.NON_FIRMWARE_ELEM_TYPES.includes(elemFw.elemType)) continue;
+
+      // Start hw-elem update
+      const updateCmd = `hwfwupd/${elemFw.elemType}/${elemFw.destname}/all`;
+      try {
+        await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(updateCmd, true);
+      } catch (error) {
+        console.log('failed to start hw-elem firmware update cmd ' + updateCmd);
+
+        // Continue with other firmwares
+        continue;
+      }
+
+      // Check the status
+      for (
+        let updateCheckLoop = 0;
+        updateCheckLoop < this.ELEM_FW_CHECK_LOOPS;
+        updateCheckLoop++
+      ) {
+        try {
+          // Wait for process to start on ESP32
+          await new Promise(resolve => setTimeout(resolve, 5000));
+
+          // Get result (or status)
+          const elUpdRslt = await this._ricMsgHandler.sendRICRESTURL<
+            RICHWFWUpdRslt
+          >('hwfwupd', true);
+
+          // Check result
+          if (
+            elUpdRslt.rslt === 'ok' &&
+            (elUpdRslt.st.s === 'idle' || elUpdRslt.st.s === 'done')
+          ) {
+            console.log(
+              'fwUpdate hw-elem updated ok - status ' +
+              elUpdRslt.st.s +
+              ' rsltmsg ' +
+              elUpdRslt.st.m,
+            );
+
+            // Check if any update outstanding (incomplete === 0)
+            allElemsUpdatedOk = elUpdRslt.st.i === 0;
+            break;
+          }
+        } catch (error) {
+          console.log('failed to get hw-elem firmware update status');
+        }
+      }
+    }
+
+    // Done update
+    this.emit(UPDATE_PROGRESS, {
+      stage: 'Finished',
+      progress: 1,
+    });
+    if (allElemsUpdatedOk) {
+      this.emit(UPDATE_SUCCESS_ALL, this._systemInfo);
+    } else {
+      this.emit(UPDATE_SUCCESS_MAIN_ONLY, this._systemInfo);
+    }
+  }
+
+  async firmwareUpdateCancel() {
+    this.emit(UPDATE_CANCELLING);
+
+    await this.fileSendCancel();
+  }
+
+  // Mark: Message handling -----------------------------------------------------------------------------------------
+
+  onRxReply(
+    msgHandle: number,
+    msgRsltCode: MessageResultCode,
+    msgRsltJsonObj: object | null,
+  ): void {
+    console.log(
+      `onRxReply msgHandle ${msgHandle} rsltCode ${msgRsltCode} obj ${JSON.stringify(
+        msgRsltJsonObj,
+      )}`,
+    );
+  }
+
+  onRxUnnumberedMsg(msgRsltJsonObj: { [key: string]: number | string }): void {
+    // console.log(
+    //   `onRxUnnumberedMsg rsltCode obj ${JSON.stringify(msgRsltJsonObj)}`,
+    // );
+
+    // Inform the file handler
+    if ('okto' in msgRsltJsonObj) {
+      this._ricFileHandler.onOktoMsg(msgRsltJsonObj.okto as number);
+    }
+  }
+
+  // Mark: Comms stats -----------------------------------------------------------------------------------------
+
+  // Get comms stats
+  getCommsStats(): CommsStats {
+    return this._commsStats;
+  }
+
+  // Mark: Published data handling -----------------------------------------------------------------------------------------
+
+  onRxSmartServo(smartServos: ROSSerialSmartServos): void {
+    // console.log(`onRxSmartServo ${JSON.stringify(smartServos)}`);
+    this._ricStateInfo.smartServos = smartServos;
+    this._ricStateInfo.smartServosValidMs = Date.now();
+  }
+
+  onRxIMU(imuData: ROSSerialIMU): void {
+    // console.log(`onRxIMU ${JSON.stringify(imuData)}`);
+    this._ricStateInfo.imuData = imuData;
+    this._ricStateInfo.imuDataValidMs = Date.now();
+  }
+
+  onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void {
+    // console.log(`onRxPowerStatus ${JSON.stringify(powerStatus)}`);
+    this._ricStateInfo.power = powerStatus;
+    this._ricStateInfo.powerValidMs = Date.now();
+  }
+
+  onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void {
+    // console.log(`onRxAddOnPub ${JSON.stringify(addOnInfo)}`);
+    this._ricStateInfo.addOnInfo = addOnInfo;
+    this._ricStateInfo.addOnInfoValidMs = Date.now();
+  }
+
+  getRICStateInfo(): RICStateInfo {
+    return this._ricStateInfo;
+  }
+
+  _objectEntries(obj: Object): Array<any> {
+    var ownProps = Object.keys(obj),
+      i = ownProps.length,
+      resArray = new Array(i); // preallocate the Array
+    while (i--)
+      resArray[i] = [ownProps[i], obj[ownProps[i]]];
+    return resArray;
+  };
+}

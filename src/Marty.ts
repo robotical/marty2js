@@ -412,31 +412,76 @@ export class Marty {
 
     /**
      *
-     * runTrajectory
-     * @param commandName command API string
-     * @param params parameters (simple name value pairs only) to parameterize trajectory
+     * runCommand
+     * @param restCmdOrJsonCmd command REST API string OR JSON command string
+     * @param params parameters (simple name value pairs only) to parameterize command (e.g. trajectory parameters)
      * @returns Promise<RICOKFail>
      *
      */
-    async runCommand(commandName: string, params: RICCmdParams): Promise<RICOKFail> {
-        try {
-            // Format the paramList as query string
-            const paramEntries = this._objectEntries(params);
-            let paramQueryStr = '';
-            for (const param of paramEntries) {
-                if (paramQueryStr.length > 0) paramQueryStr += '&';
-                paramQueryStr += param[0] + '=' + param[1];
-            }
-            // Format the url to send
-            if (paramQueryStr.length > 0) commandName += '?' + paramQueryStr;
-            return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
-                commandName,
-                true,
-            );
-        } catch (error) {
-           RICUtils.warn('runCommand failed' + error.toString());
+    async runCommand(restCmdOrJsonCmd: string, params: RICCmdParams): Promise<RICOKFail> {
+        if (restCmdOrJsonCmd == null) {
             return new RICOKFail();
         }
+        // Check if this is in JSON format
+        if (restCmdOrJsonCmd.startsWith('{')) {
+            try {
+                const msgContent = JSON.parse(restCmdOrJsonCmd);
+                if (msgContent.command === 'listFiles') {
+                    try {
+                        // TODO
+                    } catch (error) {
+                        return new RICOKFail();
+                    }
+                } else if (msgContent.command === 'saveFile') {
+                    try {
+                        // TODO
+                    } catch (error) {
+                        return new RICOKFail();
+                    }
+                } else if (msgContent.command === 'deleteFile') {
+                    try {
+                        // TODO
+                    } catch (error) {
+                        return new RICOKFail();
+                    }
+                } else if (msgContent.command === 'loadFile') {
+                    try {
+                        // TODO
+                    } catch (error) {
+                        return new RICOKFail();
+                    }
+                } else if (msgContent.command === 'playRawSound')
+                {
+                    // TODO
+                    // Send as a temp file to RIC and return promise
+                    // Then send command to play the temp file
+                    return new RICOKFail();
+                }
+            } catch (error) {
+                RICUtils.warn('runCommand failed to parse JSON ' + error.toString());
+                    return new RICOKFail();
+            }    
+        } else {
+            try {
+                // Format the paramList as query string
+                const paramEntries = this._objectEntries(params);
+                let paramQueryStr = '';
+                for (const param of paramEntries) {
+                    if (paramQueryStr.length > 0) paramQueryStr += '&';
+                    paramQueryStr += param[0] + '=' + param[1];
+                }
+                // Format the url to send
+                if (paramQueryStr.length > 0) restCmdOrJsonCmd += '?' + paramQueryStr;
+                return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+                    restCmdOrJsonCmd,
+                    true,
+                );
+            } catch (error) {
+            RICUtils.warn('runCommand failed' + error.toString());
+                return new RICOKFail();
+            }
+        }
+        return new RICOKFail();
     }
 
     // Mark: Firmware update of hardware element(s) -----------------------------------------------------------

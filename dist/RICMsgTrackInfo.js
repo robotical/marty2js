@@ -8,7 +8,7 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-import RICUtils from "./RICUtils";
+import RICUtils from "./RICUtils.js";
 export class FileBlockTrackInfo {
     constructor(prom) {
         this.isDone = false;
