@@ -527,9 +527,18 @@ export class Marty {
                     }
                 } else if (msgContent.command === 'playRawSound')
                 {
-                    // TODO
-                    // Send as a temp file to RIC and return promise
-                    // Then send command to play the temp file
+                    try {
+                        const soundData = RICUtils.atob(msgContent.soundData);
+                        if (soundData === null)
+                            return new RICOKFail();
+                        const fsResult = await this.fileSend("__tmpsnd.raw", RICFileSendType.RIC_NORMAL_FILE, soundData);
+                        if (fsResult) {
+                            this.fileRun("__tmpsnd.raw");
+                        }
+                        return new RICOKFail(fsResult);
+                    } catch(err) {
+                        console.log("Send failed", err);
+                    }
                     return new RICOKFail();
                 }
             } catch (error) {
@@ -684,7 +693,7 @@ export class Marty {
         fileName: string,
         fileType: RICFileSendType,
         fileContents: Uint8Array,
-        progressCallback: (sent: number, total: number, progress: number) => void,
+        progressCallback: ((sent: number, total: number, progress: number) => void) | undefined = undefined,
     ): Promise<boolean> {
         if (!this._connManager.isConnected()) {
             return false;

@@ -52,6 +52,7 @@ export declare class RICCalibInfo {
     calDone: number;
 }
 export declare class RICOKFail {
+    constructor(rsltFlag?: boolean | undefined);
     set(rsltFlag: boolean): void;
     rslt: string;
 }

@@ -98,8 +98,9 @@ export class RICCalibInfo {
     }
 }
 export class RICOKFail {
-    constructor() {
+    constructor(rsltFlag = undefined) {
         this.rslt = 'commsFail';
+        this.set(rsltFlag === undefined ? false : rsltFlag);
     }
     set(rsltFlag) {
         if (rsltFlag) {

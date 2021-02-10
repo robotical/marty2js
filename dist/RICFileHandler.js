@@ -158,7 +158,9 @@ export default class RICFileHandler {
     }
     _sendFileContents(fileContents, progressCallback) {
         return __awaiter(this, void 0, void 0, function* () {
-            progressCallback(0, fileContents.length, 0);
+            if (progressCallback) {
+                progressCallback(0, fileContents.length, 0);
+            }
             this._batchAckReceived = false;
             this._ackedFilePos = 0;
             // Send file blocks
@@ -195,7 +197,7 @@ export default class RICFileHandler {
                     progressUpdateCtr += this._batchAckSize;
                 }
                 // Show progress
-                if (progressUpdateCtr >= 20) {
+                if ((progressUpdateCtr >= 20) && progressCallback) {
                     // Update UI
                     progressCallback(this._ackedFilePos, fileContents.length, this._ackedFilePos / fileContents.length);
                     // Debug

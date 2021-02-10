@@ -86,7 +86,7 @@ export default class RICFileHandler {
     fileName: string,
     fileType: RICFileSendType,
     fileContents: Uint8Array,
-    progressCallback: (sent: number, total: number, progress: number) => void,
+    progressCallback: ((sent: number, total: number, progress: number) => void) | undefined,
   ): Promise<boolean> {
     this._isCancelled = false;
 
@@ -216,9 +216,11 @@ export default class RICFileHandler {
 
   async _sendFileContents(
     fileContents: Uint8Array,
-    progressCallback: (sent: number, total: number, progress: number) => void,
+    progressCallback: ((sent: number, total: number, progress: number) => void) | undefined,
   ) {
-    progressCallback(0, fileContents.length, 0);
+    if (progressCallback) {
+      progressCallback(0, fileContents.length, 0);
+    }
 
     this._batchAckReceived = false;
     this._ackedFilePos = 0;
@@ -271,7 +273,7 @@ export default class RICFileHandler {
       }
 
       // Show progress
-      if (progressUpdateCtr >= 20) {
+      if ((progressUpdateCtr >= 20) && progressCallback) {
         // Update UI
         progressCallback(
           this._ackedFilePos,

@@ -194,7 +194,7 @@ export declare class Marty {
      * @returns Promise<boolean>
      *
      */
-    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback: (sent: number, total: number, progress: number) => void): Promise<boolean>;
+    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback?: ((sent: number, total: number, progress: number) => void) | undefined): Promise<boolean>;
     fileSendCancel(): Promise<void>;
     calibrate(cmd: string, joints: string): Promise<RICOKFail | undefined>;
     getCachedSystemInfo(): RICSystemInfo | null;
