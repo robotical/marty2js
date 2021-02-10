@@ -41,7 +41,10 @@ export default class RICFileHandler {
 
   // Timeouts
   BLOCK_ACK_TIMEOUT_MS = 30000;
-  RIC_FILE_UPLOAD_START_TIMEOUT_MS = 7000;
+  RIC_FILE_UPLOAD_START_TIMEOUT_MS = 1000;
+  RIC_FW_UPLOAD_START_TIMEOUT_MS = 7000;
+  RIC_FILE_UPLOAD_END_TIMEOUT_MS = 1000;
+  RIC_FW_UPLOAD_END_TIMEOUT_MS = 30000;
 
   // Contents of file to send
   _fileBlockSize = 240;
@@ -139,12 +142,17 @@ export default class RICFileHandler {
     // Debug
     RICUtils.debug(`sendFileStartMsg ${cmdMsg}`);
 
+    // Timeout calculation
+    const startTimeoutMs = (fileType == RICFileSendType.RIC_FIRMWARE_UPDATE) ? 
+            this.RIC_FW_UPLOAD_START_TIMEOUT_MS : 
+            this.RIC_FILE_UPLOAD_START_TIMEOUT_MS;
+
     // Send
     const fileStartResp = await this._msgHandler.sendRICREST<RICFileStartResp>(
       cmdMsg,
       RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME,
       true,
-      this.RIC_FILE_UPLOAD_START_TIMEOUT_MS,
+      startTimeoutMs,
     );
 
     // Extract params
@@ -177,11 +185,17 @@ export default class RICFileHandler {
     // Await outstanding promises
     await this.awaitOutstandingMsgPromises(true);
 
+    // Timeout calculation
+    const endTimeoutMs = (fileType == RICFileSendType.RIC_FIRMWARE_UPDATE) ? 
+        this.RIC_FW_UPLOAD_END_TIMEOUT_MS : 
+        this.RIC_FILE_UPLOAD_END_TIMEOUT_MS;
+
     // Send
     return await this._msgHandler.sendRICREST(
       cmdMsg,
       RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME,
       true,
+      endTimeoutMs,
     );
   }
 
@@ -215,7 +229,7 @@ export default class RICFileHandler {
       // Sending with or without batches
       if (this._sendWithoutBatchAcks) {
         // Debug
-        RICUtils.debug(
+        RICUtils.verbose(
           `_sendFileContents NO BATCH ACKS ${progressUpdateCtr} blocks total sent ${this._ackedFilePos} block len ${this._fileBlockSize}`,
         );
 
@@ -240,7 +254,7 @@ export default class RICFileHandler {
           }
 
           // Debug
-          RICUtils.debug(
+          RICUtils.verbose(
             `_sendFileContents sendblock pos ${sendFromPos} len ${this._fileBlockSize} ackedTo ${this._ackedFilePos} fileLen ${fileContents.length}`,
           );
 
@@ -266,7 +280,7 @@ export default class RICFileHandler {
         );
 
         // Debug
-        RICUtils.debug(
+        RICUtils.verbose(
           `_sendFileContents ${progressUpdateCtr} blocks total sent ${this._ackedFilePos} block len ${this._fileBlockSize}`,
         );
 
@@ -382,7 +396,7 @@ export default class RICFileHandler {
     // Get how far we've progressed in file
     this._ackedFilePos = fileOkTo;
     this._batchAckReceived = true;
-    RICUtils.debug(`onOktoMsg received file up to ${this._ackedFilePos}`);
+    RICUtils.verbose(`onOktoMsg received file up to ${this._ackedFilePos}`);
   }
 
   async awaitOutstandingMsgPromises(all: boolean): Promise<void> {

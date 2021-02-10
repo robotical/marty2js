@@ -22,12 +22,12 @@ class MyEventListener
 }
 
 function progCB(sent, total, progress) {
-    console.log(`File transfer sent ${sent} total ${total} prog ${progress}`);
+    console.log(`File transfer sent ${sent} of total ${total} progress ${Math.round(progress*100)}%`);
 }
 
 console.log("Starting test")
 const myMarty = new Marty();
-myMarty.setLogLevel(RICLogLevel.DEBUG);
+myMarty.setLogLevel(RICLogLevel.INFO);
 const connPromise = myMarty.connect(new DiscoveredRIC("192.168.86.98", "Marty"));
 connPromise.then((rslt)=>{
     if (rslt) {
@@ -56,18 +56,17 @@ connPromise.then((rslt)=>{
         //     console.log("fileSendRslt", sendRslt)
         // },()=>console.log("Failed fileSend"))
 
-        // const fwData = fs.readFileSync("/home/rob/rdev/RIC2FirmwareIDF/build/RIC2FirmwareIDF.bin")
-        // console.log(`FW Length ${fwData.length}`)
-        // let promiseFwUpdate = myMarty.fileSend("fw.bin", RICFileSendType.RIC_FIRMWARE_UPDATE, fwData, progCB);
-        // promiseFwUpdate.then((sendRslt)=>{
-        //     console.log("fwUpdateRslt", sendRslt)
-        //     myMarty.disconnect();
-        // },
-        // () => {
-        //     console.log("Failed fwUpdate");
-        //     myMarty.disconnect();
-        // })
-        myMarty.disconnect();
+        const fwData = fs.readFileSync("/home/rob/rdev/RIC2FirmwareIDF/build/RIC2FirmwareIDF.bin")
+        console.log(`FW Length ${fwData.length}`)
+        let promiseFwUpdate = myMarty.fileSend("fw.bin", RICFileSendType.RIC_FIRMWARE_UPDATE, fwData, progCB);
+        promiseFwUpdate.then((sendRslt)=>{
+            console.log("fwUpdateRslt", sendRslt)
+            myMarty.disconnect();
+        },
+        () => {
+            console.log("Failed fwUpdate");
+            myMarty.disconnect();
+        })
     } else {
         console.log("Connect returned false");
         myMarty.disconnect();
