@@ -8,6 +8,7 @@
 // (C) Robotical 2020
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+import { RICLogLevel } from "./RICTypes.js";
 export default class RICUtils {
     /**
      *
@@ -352,18 +353,40 @@ export default class RICUtils {
         }
     }
     static debug(msg) {
-        if (msg) { }
-        // console.debug(msg);
+        if (!this.doLogging(RICLogLevel.DEBUG, msg))
+            console.debug(msg);
     }
     static info(msg) {
-        console.info(msg);
+        if (!this.doLogging(RICLogLevel.INFO, msg))
+            console.info(msg);
     }
     static warn(msg) {
-        console.warn(msg);
+        if (!this.doLogging(RICLogLevel.WARN, msg))
+            console.warn(msg);
     }
     static error(msg) {
-        console.error(msg);
+        if (!this.doLogging(RICLogLevel.ERROR, msg))
+            console.error(msg);
+    }
+    static verbose(msg) {
+        if (!this.doLogging(RICLogLevel.VERBOSE, msg))
+            console.log(msg);
+    }
+    static setLogListener(listener) {
+        this._logListener = listener;
+    }
+    static setLogLevel(logLevel) {
+        this._logLevel = logLevel;
+    }
+    static doLogging(logLevel, msg) {
+        if (this._logListener) {
+            this._logListener(logLevel, msg);
+            return true;
+        }
+        return this._logLevel < logLevel;
     }
 }
 RICUtils._isEndianSet = false;
 RICUtils._isLittleEndian = false;
+RICUtils._logListener = null;
+RICUtils._logLevel = RICLogLevel.INFO;

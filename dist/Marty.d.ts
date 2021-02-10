@@ -4,7 +4,7 @@ import CommsStats from './CommsStats.js';
 import RICAddOnManager from './RICAddOnManager.js';
 import RICConnManager from './RICConnManager.js';
 import { ROSSerialSmartServos, ROSSerialIMU, ROSSerialPowerStatus, ROSSerialAddOnStatusList } from './RICROSSerial.js';
-import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType, RICEventIF } from './RICTypes.js';
+import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType, RICEventIF, RICLogFn, RICLogLevel } from './RICTypes.js';
 export declare class Marty {
     _ricEventListener: RICEventIF | null;
     _systemInfo: RICSystemInfo | null;
@@ -49,7 +49,11 @@ export declare class Marty {
     constructor();
     setEventListener(listener: RICEventIF): void;
     removeEventListener(): void;
+    getEventStr(connEvent: RICEvent): string;
     setFetchBlobCallback(fetchBlobFn: RICFetchBlobFnType): void;
+    setLogListener(listener: RICLogFn): void;
+    removeLogListener(): void;
+    setLogLevel(logLevel: RICLogLevel): void;
     /**
      * Connect to a RIC
      *
@@ -198,7 +202,7 @@ export declare class Marty {
     getCachedCalibInfo(): RICCalibInfo | null;
     getCachedRICName(): string | null;
     getCachedRICNameIsSet(): boolean;
-    checkForUpdate(): Promise<void>;
+    checkForUpdate(): Promise<boolean>;
     _isUpdateRequired(latestVersion: RICUpdateInfo, systemInfo: RICSystemInfo | null): Promise<boolean>;
     firmwareUpdate(): Promise<void>;
     firmwareUpdateCancel(): Promise<void>;

@@ -9,9 +9,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+import { RICLogLevel, RICLogFn } from "./RICTypes.js";
+
 export default class RICUtils {
   static _isEndianSet = false;
   static _isLittleEndian = false;
+  static _logListener: RICLogFn | null = null;
+  static _logLevel = RICLogLevel.INFO;
 
   /**
    *
@@ -372,20 +376,43 @@ export default class RICUtils {
     }
 
   static debug(msg: string) {
-    if (msg) {}
-    // console.debug(msg);
+    if (!this.doLogging(RICLogLevel.DEBUG, msg))
+      console.debug(msg);
   }
 
   static info(msg: string) {
-    console.info(msg);
+    if (!this.doLogging(RICLogLevel.INFO, msg))
+      console.info(msg);
   }
 
   static warn(msg: string) {
-    console.warn(msg);
+    if (!this.doLogging(RICLogLevel.WARN, msg))
+      console.warn(msg);
   }
 
   static error(msg: string) {
-    console.error(msg);
+    if (!this.doLogging(RICLogLevel.ERROR, msg))
+      console.error(msg);
   }
 
+  static verbose(msg: string) {
+    if (!this.doLogging(RICLogLevel.VERBOSE, msg))
+      console.log(msg);
+  }
+
+  static setLogListener(listener: RICLogFn | null) {
+    this._logListener = listener;
+  }
+
+  static setLogLevel(logLevel: RICLogLevel): void {
+    this._logLevel = logLevel;
+  }
+
+  static doLogging(logLevel: RICLogLevel, msg: string): boolean {
+    if (this._logListener) {
+      this._logListener(logLevel, msg)
+      return true;
+    } 
+    return this._logLevel < logLevel;
+  }
 }

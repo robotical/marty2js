@@ -41,6 +41,7 @@ export default class RICFileHandler {
 
   // Timeouts
   BLOCK_ACK_TIMEOUT_MS = 30000;
+  RIC_FILE_UPLOAD_START_TIMEOUT_MS = 7000;
 
   // Contents of file to send
   _fileBlockSize = 240;
@@ -143,6 +144,7 @@ export default class RICFileHandler {
       cmdMsg,
       RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME,
       true,
+      this.RIC_FILE_UPLOAD_START_TIMEOUT_MS,
     );
 
     // Extract params
@@ -212,9 +214,15 @@ export default class RICFileHandler {
     while (this._ackedFilePos < fileContents.length) {
       // Sending with or without batches
       if (this._sendWithoutBatchAcks) {
+        // Debug
+        RICUtils.debug(
+          `_sendFileContents NO BATCH ACKS ${progressUpdateCtr} blocks total sent ${this._ackedFilePos} block len ${this._fileBlockSize}`,
+        );
+
         await this._sendFileBlock(fileContents, this._ackedFilePos);
         this._ackedFilePos += this._fileBlockSize;
         progressUpdateCtr++;
+
       } else {
         // NOTE: first batch MUST be of size 1 (not _batchAckSize) because RIC performs a long-running
         // blocking task immediately after receiving the first message in a firmware
@@ -230,8 +238,15 @@ export default class RICFileHandler {
           if (i == batchSize - 1) {
             this._batchAckReceived = false;
           }
+
+          // Debug
+          RICUtils.debug(
+            `_sendFileContents sendblock pos ${sendFromPos} len ${this._fileBlockSize} ackedTo ${this._ackedFilePos} fileLen ${fileContents.length}`,
+          );
+
           await this._sendFileBlock(fileContents, sendFromPos);
           sendFromPos += this._fileBlockSize;
+
         }
 
         // Wait for response (there is a timeout at the ESP end to ensure a response is always returned
@@ -266,7 +281,7 @@ export default class RICFileHandler {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
       const checkFunction = async () => {
-        RICUtils.debug(`this._batchAckReceived: ${this._batchAckReceived}`);
+        RICUtils.verbose(`this._batchAckReceived: ${this._batchAckReceived}`);
         if (this._isCancelled) {
           RICUtils.debug('Cancelling file upload');
           this._isCancelled = false;
@@ -349,6 +364,9 @@ export default class RICFileHandler {
           true,
           // Platform.OS === 'ios',
         );
+
+        // Debug
+        // RICUtils.verbose(RICUtils.buf2hex(framedMsg));
 
         // Add to list of pending messages
         if (promRslt !== null)

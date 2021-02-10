@@ -14,6 +14,7 @@ export default class RICFileHandler {
     _fileSendStateMs: number;
     _fileSendMsgHandle: number;
     BLOCK_ACK_TIMEOUT_MS: number;
+    RIC_FILE_UPLOAD_START_TIMEOUT_MS: number;
     _fileBlockSize: number;
     _batchAckSize: number;
     _fileNumBlocks: number;

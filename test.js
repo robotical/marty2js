@@ -1,43 +1,80 @@
-
-// import AAA from "./t2.js";
-// console.log(AAA)
-// const aaa = new AAA();
-
-
-
-// import MiniHDLC from "./build/MiniHDLC"
-
-// const MiniHDLC = require("./build/MiniHDLC");
-
-// console.log(MiniHDLC);
-
-// const myHDLC = new MiniHDLC();
-
-// console.log(myHDLC);
-
-// const miniHDLC = MiniHDLC.MiniHDLC;
-
-// miniHDLC.encode(new Uint8Array(2));
-
 import { Marty } from "./dist/Marty.js"
-import { DiscoveredRIC } from "./dist/RICTypes.js";
+import { DiscoveredRIC, RICFileSendType, RICLogLevel } from "./dist/RICTypes.js";
+import * as fs from 'fs';
 
+class MyEventListener
+{
+    onRxSmartServo(smartServos) {
+        // console.log("SmartServoData");
+    }
+    onRxIMU(imuData) {
+        // console.log("IMUData");
+    }
+    onRxPowerStatus(powerStatus) {
+        // console.log("PowerStatus");
+    }
+    onRxAddOnPub(addOnInfo) {
+        // console.log("AddOnInfo");
+    }
+    onConnEvent(connEvent, connEventArgs) {
+        console.log("ConnEvent ", myMarty.getEventStr(connEvent), connEventArgs);
+    }
+}
+
+function progCB(sent, total, progress) {
+    console.log(`File transfer sent ${sent} total ${total} prog ${progress}`);
+}
+
+console.log("Starting test")
 const myMarty = new Marty();
-// const encoded = myMarty.encode(new Uint8Array(5));
-// console.log(encoded);
+myMarty.setLogLevel(RICLogLevel.DEBUG);
+const connPromise = myMarty.connect(new DiscoveredRIC("192.168.86.98", "Marty"));
+connPromise.then((rslt)=>{
+    if (rslt) {
+        console.log("RIC Connected")
 
-console.log("Here")
+        myMarty.setEventListener(new MyEventListener())
 
-const rslt = myMarty.connect(new DiscoveredRIC("192.168.86.98", "Marty"));
+        // let promiseRicName = myMarty.getRICName()
+        // promiseRicName.then((ricName)=>{
+        //     console.log("ricName", ricName)
+        // },()=>console.log("Failed ricName"))
 
-rslt.then(()=>{
-    console.log("OK")
-    let ricName = myMarty.getRICName()
-    console.log("ricName")
-    ricName.then(()=>{
-        console.log("ricName", ricName)
-    },()=>console.log("FailedRICName"))
-},()=>{console.log("Failed")})
+        // let promiseFileList = myMarty.getFileList()
+        // promiseFileList.then((fileList)=>{
+        //     console.log("fileList", fileList)
+        // },()=>console.log("Failed fileList"))
+
+        // let promiseUpdate = myMarty.checkForUpdate()
+        // promiseUpdate.then((updateAvailable)=>{
+        //     console.log("updateAvailable", updateAvailable)
+        //     console.log(myMarty.getCachedSystemInfo())
+        // },()=>console.log("Failed updateAvailable"))
+
+        // let promiseFile = myMarty.fileSend("test.raw", RICFileSendType.RIC_NORMAL_FILE, new Uint8Array(1000), progCB);
+        // promiseFile.then((sendRslt)=>{
+        //     console.log("fileSendRslt", sendRslt)
+        // },()=>console.log("Failed fileSend"))
+
+        // const fwData = fs.readFileSync("/home/rob/rdev/RIC2FirmwareIDF/build/RIC2FirmwareIDF.bin")
+        // console.log(`FW Length ${fwData.length}`)
+        // let promiseFwUpdate = myMarty.fileSend("fw.bin", RICFileSendType.RIC_FIRMWARE_UPDATE, fwData, progCB);
+        // promiseFwUpdate.then((sendRslt)=>{
+        //     console.log("fwUpdateRslt", sendRslt)
+        //     myMarty.disconnect();
+        // },
+        // () => {
+        //     console.log("Failed fwUpdate");
+        //     myMarty.disconnect();
+        // })
+        myMarty.disconnect();
+    } else {
+        console.log("Connect returned false");
+        myMarty.disconnect();
+    }
+},()=>{
+    console.log("Failed to connect"); 
+});
 
 
 

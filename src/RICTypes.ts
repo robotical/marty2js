@@ -323,3 +323,14 @@ export interface RICEventIF {
     onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
     onConnEvent: RICConnEventFn;
 }
+
+export enum RICLogLevel {
+    NONE,
+    ERROR,
+    WARN,
+    INFO,
+    DEBUG,
+    VERBOSE
+}
+
+export type RICLogFn = (logLevel: RICLogLevel, msg: string) => void;

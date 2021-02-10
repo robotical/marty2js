@@ -12,8 +12,9 @@ export default class MsgTrackInfo {
     retryCount: number;
     withResponse: boolean;
     msgHandle: number;
-    resolve: unknown;
-    reject: unknown;
+    msgTimeoutMs: number | undefined;
+    resolve: ((value: any) => void) | null;
+    reject: ((reason?: any) => void) | null;
     constructor();
-    set(msgOutstanding: boolean, msgFrame: Uint8Array, withResponse: boolean, msgHandle: number, resolve: unknown, reject: unknown): void;
+    set(msgOutstanding: boolean, msgFrame: Uint8Array, withResponse: boolean, msgHandle: number, msgTimeoutMs: number | undefined, resolve: (value: any) => void, reject: (reason?: any) => void): void;
 }

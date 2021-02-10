@@ -36,15 +36,19 @@ export default class MsgTrackInfo {
         this.retryCount = 0;
         this.withResponse = false;
         this.msgHandle = 0;
+        this.msgTimeoutMs = undefined;
+        this.resolve = null;
+        this.reject = null;
         this.msgOutstanding = false;
     }
-    set(msgOutstanding, msgFrame, withResponse, msgHandle, resolve, reject) {
+    set(msgOutstanding, msgFrame, withResponse, msgHandle, msgTimeoutMs, resolve, reject) {
         this.msgOutstanding = msgOutstanding;
         this.msgFrame = msgFrame;
         this.retryCount = 0;
         this.msgSentMs = Date.now();
         this.withResponse = withResponse;
         this.msgHandle = msgHandle;
+        this.msgTimeoutMs = msgTimeoutMs;
         this.resolve = resolve;
         this.reject = reject;
     }

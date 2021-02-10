@@ -42,8 +42,9 @@ export default class MsgTrackInfo {
   retryCount = 0;
   withResponse = false;
   msgHandle = 0;
-  resolve: unknown;
-  reject: unknown;
+  msgTimeoutMs: number | undefined = undefined;
+  resolve: ((value: any) => void) | null = null;
+  reject: ((reason?: any) => void) | null = null;
 
   constructor() {
     this.msgOutstanding = false;
@@ -54,8 +55,9 @@ export default class MsgTrackInfo {
     msgFrame: Uint8Array,
     withResponse: boolean,
     msgHandle: number,
-    resolve: unknown,
-    reject: unknown,
+    msgTimeoutMs: number | undefined,
+    resolve: (value: any) => void,
+    reject: (reason?: any) => void,
   ) {
     this.msgOutstanding = msgOutstanding;
     this.msgFrame = msgFrame;
@@ -63,6 +65,7 @@ export default class MsgTrackInfo {
     this.msgSentMs = Date.now();
     this.withResponse = withResponse;
     this.msgHandle = msgHandle;
+    this.msgTimeoutMs = msgTimeoutMs;
     this.resolve = resolve;
     this.reject = reject;
   }

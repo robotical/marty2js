@@ -37,6 +37,7 @@ export default class RICFileHandler {
         this._fileSendMsgHandle = 0;
         // Timeouts
         this.BLOCK_ACK_TIMEOUT_MS = 30000;
+        this.RIC_FILE_UPLOAD_START_TIMEOUT_MS = 7000;
         // Contents of file to send
         this._fileBlockSize = 240;
         this._batchAckSize = 1;
@@ -108,7 +109,7 @@ export default class RICFileHandler {
             // Debug
             RICUtils.debug(`sendFileStartMsg ${cmdMsg}`);
             // Send
-            const fileStartResp = yield this._msgHandler.sendRICREST(cmdMsg, RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME, true);
+            const fileStartResp = yield this._msgHandler.sendRICREST(cmdMsg, RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME, true, this.RIC_FILE_UPLOAD_START_TIMEOUT_MS);
             // Extract params
             if (fileStartResp.batchMsgSize) {
                 this._fileBlockSize = fileStartResp.batchMsgSize;
@@ -154,6 +155,8 @@ export default class RICFileHandler {
             while (this._ackedFilePos < fileContents.length) {
                 // Sending with or without batches
                 if (this._sendWithoutBatchAcks) {
+                    // Debug
+                    RICUtils.debug(`_sendFileContents NO BATCH ACKS ${progressUpdateCtr} blocks total sent ${this._ackedFilePos} block len ${this._fileBlockSize}`);
                     yield this._sendFileBlock(fileContents, this._ackedFilePos);
                     this._ackedFilePos += this._fileBlockSize;
                     progressUpdateCtr++;
@@ -169,6 +172,8 @@ export default class RICFileHandler {
                         if (i == batchSize - 1) {
                             this._batchAckReceived = false;
                         }
+                        // Debug
+                        RICUtils.debug(`_sendFileContents sendblock pos ${sendFromPos} len ${this._fileBlockSize} ackedTo ${this._ackedFilePos} fileLen ${fileContents.length}`);
                         yield this._sendFileBlock(fileContents, sendFromPos);
                         sendFromPos += this._fileBlockSize;
                     }
@@ -196,7 +201,7 @@ export default class RICFileHandler {
             return new Promise((resolve, reject) => {
                 const startTime = Date.now();
                 const checkFunction = () => __awaiter(this, void 0, void 0, function* () {
-                    RICUtils.debug(`this._batchAckReceived: ${this._batchAckReceived}`);
+                    RICUtils.verbose(`this._batchAckReceived: ${this._batchAckReceived}`);
                     if (this._isCancelled) {
                         RICUtils.debug('Cancelling file upload');
                         this._isCancelled = false;
@@ -260,6 +265,8 @@ export default class RICFileHandler {
                     const framedMsg = this._msgHandler._miniHDLC.encode(msgBuf);
                     // Send without awaiting immediately
                     const promRslt = this._msgSender.sendTxMsgNoAwait(framedMsg, true);
+                    // Debug
+                    // RICUtils.verbose(RICUtils.buf2hex(framedMsg));
                     // Add to list of pending messages
                     if (promRslt !== null)
                         this._msgAwaitList.push(new FileBlockTrackInfo(promRslt));
