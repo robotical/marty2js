@@ -192,6 +192,7 @@ export class Marty {
         await this._connManager.disconnect();
     }
 
+
     // Mark: Robot Control ------------------------------------------------------------------------------------
 
     /**
@@ -459,6 +460,16 @@ export class Marty {
         }
     }
 
+
+    //get the name of the addons type from the type code
+
+
+    convertHWElemType(whoAmITypeCode: string | undefined){
+        return this._addOnManager.convertHWElemType(whoAmITypeCode);
+    }
+
+
+
     // Mark: Get HWElem list -----------------------------------------------------------
 
     /**
@@ -468,9 +479,9 @@ export class Marty {
      *
      */
     async getHWElemList(): Promise<RICHWElemList> {
-        console.log("[DEBUG]: About to try to grab HW List");
+        // console.log("[DEBUG]: About to try to grab HW List");
         try {
-            console.log("[DEBUG]: Trying to grab HW List");
+            // console.log("[DEBUG]: Trying to grab HW List");
             const ricHWList = await this._ricMsgHandler.sendRICRESTURL<RICHWElemList>(
                 'hwstatus',
                 true,
@@ -484,6 +495,7 @@ export class Marty {
             return new RICHWElemList();
         }
     }
+
 
     // Mark: Set AddOn config -----------------------------------------------------------
 

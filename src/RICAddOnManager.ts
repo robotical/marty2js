@@ -1,5 +1,6 @@
 import { Dictionary, RICHWElem } from './RICTypes.js';
 import {
+  getHWElemTypeStr,
   RICAddOnBase,
   RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO,
   RICAddOnGrabServo,
@@ -29,12 +30,17 @@ export default class RICAddOnManager {
 
   setHWElems(hwElems: Array<RICHWElem>) {
     this._addOnMap = this.getMappingOfAddOns(hwElems);
-    console.log('AddonMap');
   }
 
   clear() {
     this._addOnMap = {};
   }
+
+
+  convertHWElemType(whoAmITypeCode: string | undefined){
+    return getHWElemTypeStr(whoAmITypeCode);
+  } 
+
 
   getMappingOfAddOns(hwElems: Array<RICHWElem>): Dictionary<RICAddOnBase> {
     const addOnMap: Dictionary<RICAddOnBase> = {};

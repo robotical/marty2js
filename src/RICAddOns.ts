@@ -190,19 +190,19 @@ export function getHWElemTypeStr(whoAmITypeCode: string | undefined) {
     case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE):
       //console.log("Found LED Eye");
       return 'DiscoEyes';
-    case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT):
       return 'IRFoot';
 
-    case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
       return 'ColourSensor';
 
-    case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE):
       return 'DistanceSensor';
 
-    case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_NOISE):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_NOISE):
       return 'NoiseSensor';
 
-    case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
       return 'LightSensor';
   }
   return `Unknown (${whoAmITypeCode})`;
