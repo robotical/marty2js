@@ -373,7 +373,7 @@ export default class RICUtils {
 
   static debug(msg: string) {
     if (msg) {}
-    // console.debug(msg);
+    console.debug(msg);
   }
 
   static info(msg: string) {
