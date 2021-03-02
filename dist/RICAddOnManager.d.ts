@@ -6,6 +6,7 @@ export default class RICAddOnManager {
     _addOnMap: Dictionary<RICAddOnBase>;
     setHWElems(hwElems: Array<RICHWElem>): void;
     clear(): void;
+    convertHWElemType(whoAmITypeCode: string | undefined): string;
     getMappingOfAddOns(hwElems: Array<RICHWElem>): Dictionary<RICAddOnBase>;
     processPublishedData(addOnID: number, statusByte: number, rawData: Uint8Array): ROSSerialAddOnStatus | null;
 }

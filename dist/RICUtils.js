@@ -353,7 +353,7 @@ export default class RICUtils {
     }
     static debug(msg) {
         if (msg) { }
-        // console.debug(msg);
+        console.debug(msg);
     }
     static info(msg) {
         console.info(msg);

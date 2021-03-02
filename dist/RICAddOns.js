@@ -2,15 +2,16 @@ import DataExtractor, { DataExtractorVarType } from './DataExtractor.js';
 import { ROSSerialAddOnStatus } from './RICROSSerial.js';
 import RICUtils from './RICUtils.js';
 // RIC ADDON CODES
-export const RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE = '00000083';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT = '00000084';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR = '00000085';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT = '00000086';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT = '00000087';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM = '00000088';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE = '00000089';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE = '0000008A';
-export const RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO = '0000008B';
+export const RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE = '00000083'; //131
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT = '00000084'; //132
+export const RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR = '00000085'; //133
+export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1 = '00000086'; //134
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT = '00000087'; //135
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM = '00000088'; //136
+export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE = '00000089'; //137
+export const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE = '0000008A'; //138
+export const RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO = '0000008B'; //139
+export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2 = '0000008C'; //140
 // Format definitions
 const ADDON_IRFOOT_FORMAT_DEF = {
     fields: [
@@ -168,26 +169,24 @@ export function getHWElemTypeStr(whoAmITypeCode) {
     }
     switch (parseInt(whoAmITypeCode)) {
         case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
-            console.log("Found Grabber Arm");
             return 'GripperArm';
         case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
-            //console.log("Found LED Foot");
             return 'DiscoFoot';
         case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM):
-            //console.log("Found LED Arm");
             return 'DiscoArm';
         case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE):
-            //console.log("Found LED Eye");
             return 'DiscoEyes';
-        case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT):
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1):
             return 'IRFoot';
-        case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2):
+            return 'IRFoot';
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
             return 'ColourSensor';
-        case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE):
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE):
             return 'DistanceSensor';
-        case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_NOISE):
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_NOISE):
             return 'NoiseSensor';
-        case parseInt(RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
+        case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
             return 'LightSensor';
     }
     return `Unknown (${whoAmITypeCode})`;
@@ -211,7 +210,6 @@ export class RICAddOnGrabServo extends RICAddOnBase {
     processPublishedData(addOnID, statusByte) {
         // Status to return
         const retStatus = new ROSSerialAddOnStatus();
-        // console.log("RICADDONMANAGER: debugging info");
         // Extract data
         retStatus.id = addOnID;
         retStatus.deviceTypeID = this._deviceTypeID;
@@ -228,7 +226,6 @@ export class RICAddOnLEDFoot extends RICAddOnBase {
     processPublishedData(addOnID, statusByte) {
         // Status to return
         const retStatus = new ROSSerialAddOnStatus();
-        // console.log("RICADDONMANAGER: debugging info");
         // Extract data
         retStatus.id = addOnID;
         retStatus.deviceTypeID = this._deviceTypeID;
@@ -270,9 +267,18 @@ export class RICAddOnLEDEye extends RICAddOnBase {
     }
 }
 export class RICAddOnIRFoot extends RICAddOnBase {
-    constructor(name) {
+    constructor(name, versionNumber) {
         super(name);
-        this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT);
+        this._deviceTypeID = 0;
+        if (versionNumber == 1) {
+            this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1);
+        }
+        else if (versionNumber == 2) {
+            this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2);
+        }
+        else {
+            RICUtils.error("Incorrect IRFoot version number given: " + versionNumber);
+        }
         this._dataExtractor = new DataExtractor(name, ADDON_IRFOOT_FORMAT_DEF);
     }
     processPublishedData(addOnID, statusByte, rawData) {
