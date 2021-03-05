@@ -527,6 +527,10 @@ export class Marty {
             }
         });
     }
+    //get the name of the addons type from the type code
+    convertHWElemType(whoAmITypeCode, whoAmI) {
+        return this._addOnManager.convertHWElemType(whoAmITypeCode, whoAmI);
+    }
     // Mark: Get HWElem list -----------------------------------------------------------
     /**
      *
@@ -536,7 +540,9 @@ export class Marty {
      */
     getHWElemList() {
         return __awaiter(this, void 0, void 0, function* () {
+            // console.log("[DEBUG]: About to try to grab HW List");
             try {
+                // console.log("[DEBUG]: Trying to grab HW List");
                 const ricHWList = yield this._ricMsgHandler.sendRICRESTURL('hwstatus', true);
                 RICUtils.debug('getHWElemList returned ' + JSON.stringify(ricHWList));
                 this._hwElems = ricHWList.hw;

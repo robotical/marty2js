@@ -155,6 +155,7 @@ export declare class Marty {
      *
      */
     hwElemFirmwareUpdate(): Promise<RICOKFail>;
+    convertHWElemType(whoAmITypeCode: string | undefined, whoAmI: string | undefined): string;
     /**
      *
      * getHWElemList - get list of HWElems on the robot (including add-ons)

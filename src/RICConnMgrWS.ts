@@ -69,7 +69,7 @@ export default class RICConnMgrWS {
      */
     async connect(discoveredRIC: DiscoveredRIC): Promise<boolean> {
 
-        // Now connecting
+        // console.log("RICConnMgrWS: " + discoveredRIC.ipAddress);
         if (this._onStateChangeListener) {
             this._onStateChangeListener(RICEvent.CONNECTING_RIC,
                 {

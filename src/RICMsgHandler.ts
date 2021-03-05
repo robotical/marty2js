@@ -367,7 +367,7 @@ export default class RICMsgHandler {
 
         // Return msg handle
         if (!isNumbered) {
-          resolve();
+          (resolve as any)()
         }
       } catch (error) {
         reject(error);
