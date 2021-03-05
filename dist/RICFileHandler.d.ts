@@ -14,6 +14,10 @@ export default class RICFileHandler {
     _fileSendStateMs: number;
     _fileSendMsgHandle: number;
     BLOCK_ACK_TIMEOUT_MS: number;
+    RIC_FILE_UPLOAD_START_TIMEOUT_MS: number;
+    RIC_FW_UPLOAD_START_TIMEOUT_MS: number;
+    RIC_FILE_UPLOAD_END_TIMEOUT_MS: number;
+    RIC_FW_UPLOAD_END_TIMEOUT_MS: number;
     _fileBlockSize: number;
     _batchAckSize: number;
     _fileNumBlocks: number;
@@ -30,12 +34,12 @@ export default class RICFileHandler {
     _msgOutstanding: Promise<void> | null;
     constructor(msgHandler: RICMsgHandler, commsStats: CommsStats);
     registerMsgSender(messageSender: MessageSender): void;
-    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback: (sent: number, total: number, progress: number) => void): Promise<boolean>;
+    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback: ((sent: number, total: number, progress: number) => void) | undefined): Promise<boolean>;
     fileSendCancel(): Promise<void>;
     _sendFileStartMsg(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array): Promise<void>;
     _sendFileEndMsg(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array): Promise<void>;
     _sendFileCancelMsg(): Promise<void>;
-    _sendFileContents(fileContents: Uint8Array, progressCallback: (sent: number, total: number, progress: number) => void): Promise<void>;
+    _sendFileContents(fileContents: Uint8Array, progressCallback: ((sent: number, total: number, progress: number) => void) | undefined): Promise<void>;
     batchAck(timeout: number): Promise<void>;
     _sendFileBlock(fileContents: Uint8Array, blockStart: number): Promise<number>;
     onOktoMsg(fileOkTo: number): void;

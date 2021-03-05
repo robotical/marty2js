@@ -79,7 +79,7 @@ export interface MessageSender {
 
 // Message tracking
 const MAX_MSG_NUM = 255;
-const MSG_RESPONSE_TIMEOUT_MS = 5000;
+const MSG_RESPONSE_TIMEOUT_MS = 500;
 const MSG_RETRY_COUNT = 5;
 
 export default class RICMsgHandler {
@@ -90,6 +90,7 @@ export default class RICMsgHandler {
     MAX_MSG_NUM + 1,
   );
   _msgTrackCheckTimer: ReturnType<typeof setTimeout> | null = null;
+  _msgTrackTimerEnabled = false;
   _msgTrackTimerMs = 100;
 
   // Interface to inform of message results
@@ -118,14 +119,25 @@ export default class RICMsgHandler {
       this._msgTrackInfos[i] = new MsgTrackInfo();
     }
 
-    // Timer for checking messages
-    this._msgTrackCheckTimer = setTimeout(async () => {
-      this._onMsgTrackTimer();
-    }, this._msgTrackTimerMs);
-
     // HDLC used to encode/decode the RICREST protocol
     this._miniHDLC = new MiniHDLC();
     this._miniHDLC.onRxFrame = this._onHDLCFrameDecode.bind(this);
+  }
+
+  open(): void {
+    // Timer for checking messages
+    this._msgTrackTimerEnabled = true;
+    this._msgTrackCheckTimer = setTimeout(async () => {
+      this._onMsgTrackTimer();
+    }, this._msgTrackTimerMs);
+  }
+
+  close(): void {
+    this._msgTrackTimerEnabled = false;
+    if (this._msgTrackCheckTimer) {
+      clearTimeout(this._msgTrackCheckTimer);
+      this._msgTrackCheckTimer = null;
+    }
   }
 
   registerForResults(msgResultHandler: MessageResult) {
@@ -138,7 +150,7 @@ export default class RICMsgHandler {
 
   handleNewRxMsg(rxMsg: Uint8Array): void {
     this._miniHDLC.addRxBytes(rxMsg);
-    // RICUtils.debug(`HandleRxBytes len ${rxMsg.length} ${RICUtils.bufferToHex(rxMsg)}`)
+    RICUtils.verbose(`HandleRxBytes len ${rxMsg.length} ${RICUtils.bufferToHex(rxMsg)}`)
   }
 
   _onHDLCFrameDecode(rxMsg: Uint8Array): void {
@@ -151,7 +163,7 @@ export default class RICMsgHandler {
       return;
     }
 
-    // RICUtils.debug('handleNewRxMsg len %d', rxMsg.length);
+    RICUtils.verbose(`handleNewRxMsg len ${rxMsg.length}`);
 
     // Decode the RICFrame header
     const rxMsgNum = rxMsg[RICSERIAL_MSG_NUM_POS] & 0xff;
@@ -164,11 +176,11 @@ export default class RICMsgHandler {
 
     // Decode payload
     if (rxProtocol == PROTOCOL_RICREST) {
-      // RICUtils.debug(
-      //   `handleNewRxMsg RICREST rx msgNum ${rxMsgNum} msgDirn ${rxDirn} ${RICUtils.bufferToHex(
-      //     rxMsg,
-      //   )}`,
-      // );
+      RICUtils.verbose(
+        `handleNewRxMsg RICREST rx msgNum ${rxMsgNum} msgDirn ${rxDirn} ${RICUtils.bufferToHex(
+          rxMsg,
+        )}`,
+      );
       // Extract payload
       const ricRestElemCode =
         rxMsg[RICSERIAL_PAYLOAD_POS + RICREST_REST_ELEM_CODE_POS] & 0xff;
@@ -240,21 +252,31 @@ export default class RICMsgHandler {
     }
   }
 
-  async sendRICRESTURL<T>(cmdStr: string, msgTracking: boolean): Promise<T> {
+  async sendRICRESTURL<T>(
+    cmdStr: string, 
+    msgTracking: boolean,
+    msgTimeoutMs: number | undefined = undefined,
+  ): Promise<T> {
     // Send
     return await this.sendRICREST(
       cmdStr,
       RICRESTElemCode.RICREST_REST_ELEM_URL,
       msgTracking,
+      msgTimeoutMs,
     );
   }
 
-  async sendRICRESTCmdFrame<T>(cmdStr: string, msgTracking: boolean): Promise<T> {
+  async sendRICRESTCmdFrame<T>(
+    cmdStr: string, 
+    msgTracking: boolean,
+    msgTimeoutMs: number | undefined = undefined,
+  ): Promise<T> {
     // Send
     return await this.sendRICREST(
       cmdStr,
       RICRESTElemCode.RICREST_REST_ELEM_COMMAND_FRAME,
       msgTracking,
+      msgTimeoutMs,
     );
   }
 
@@ -262,6 +284,7 @@ export default class RICMsgHandler {
     cmdStr: string,
     ricRESTElemCode: RICRESTElemCode,
     msgTracking: boolean,
+    msgTimeoutMs: number | undefined = undefined,
   ): Promise<T> {
     // Put cmdStr into buffer
     const cmdStrTerm = new Uint8Array(cmdStr.length + 1);
@@ -274,6 +297,7 @@ export default class RICMsgHandler {
       ricRESTElemCode,
       msgTracking,
       true,
+      msgTimeoutMs,
     );
   }
 
@@ -282,6 +306,7 @@ export default class RICMsgHandler {
     ricRESTElemCode: RICRESTElemCode,
     isNumbered: boolean,
     withResponse: boolean,
+    msgTimeoutMs: number | undefined = undefined,
   ): Promise<T> {
     // Form message
     const cmdMsg = new Uint8Array(cmdBytes.length + RICREST_HEADER_PAYLOAD_POS);
@@ -295,6 +320,7 @@ export default class RICMsgHandler {
       ProtocolMsgProtocol.MSG_PROTOCOL_RICREST,
       isNumbered,
       withResponse,
+      msgTimeoutMs,
     );
   }
 
@@ -304,6 +330,7 @@ export default class RICMsgHandler {
     msgProtocol: ProtocolMsgProtocol,
     isNumbered: boolean,
     withResponse: boolean,
+    msgTimeoutMs: number | undefined,
   ): Promise<T> {
     const promise = new Promise<T>(async (resolve, reject) => {
       try {
@@ -329,7 +356,7 @@ export default class RICMsgHandler {
 
         // Update message tracking
         if (isNumbered) {
-          this.msgTrackingTxCmdMsg<T>(framedMsg, withResponse, resolve, reject);
+          this.msgTrackingTxCmdMsg<T>(framedMsg, withResponse, msgTimeoutMs, resolve, reject);
           this._currentMsgHandle++;
         }
 
@@ -353,6 +380,7 @@ export default class RICMsgHandler {
   msgTrackingTxCmdMsg<T>(
     msgFrame: Uint8Array,
     withResponse: boolean,
+    msgTimeoutMs: number | undefined,
     resolve: (arg: T) => void,
     reject: (reason: Error) => void,
   ): void {
@@ -367,18 +395,19 @@ export default class RICMsgHandler {
       msgFrame,
       withResponse,
       this._currentMsgHandle,
+      msgTimeoutMs,
       resolve,
       reject,
     );
 
     // Debug
-    // RICUtils.debug(
-    //   `msgTrackingTxCmdMsg msgNum ${
-    //     this._currentMsgNumber
-    //   } msg ${RICUtils.bufferToHex(msgFrame)} sanityCheck ${
-    //     this._msgTrackInfos[this._currentMsgNumber].msgOutstanding
-    //   }`,
-    // );
+    RICUtils.verbose(
+      `msgTrackingTxCmdMsg msgNum ${
+        this._currentMsgNumber
+      } msg ${RICUtils.bufferToHex(msgFrame)} sanityCheck ${
+        this._msgTrackInfos[this._currentMsgNumber].msgOutstanding
+      }`,
+    );
 
     // Stats
     this._commsStats.msgTx();
@@ -443,7 +472,7 @@ export default class RICMsgHandler {
       const reject = this._msgTrackInfos[msgNum].reject;
       if (reject) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (reject as any)(new Error(`Message failed ${msgRsltCode}`));
+        (reject as any)(new Error(`Message failed ${MessageResultCode[msgRsltCode]}`));
       }
     }
     this._msgTrackInfos[msgNum].resolve = null;
@@ -455,9 +484,12 @@ export default class RICMsgHandler {
     // Check message timeouts
     for (let i = 0; i < MAX_MSG_NUM + 1; i++) {
       if (!this._msgTrackInfos[i].msgOutstanding) continue;
+      let msgTimeoutMs = this._msgTrackInfos[i].msgTimeoutMs;
+      if (msgTimeoutMs === undefined)
+        msgTimeoutMs = MSG_RESPONSE_TIMEOUT_MS;
       if (
         Date.now() >
-        this._msgTrackInfos[i].msgSentMs + MSG_RESPONSE_TIMEOUT_MS
+        this._msgTrackInfos[i].msgSentMs + msgTimeoutMs
       ) {
         RICUtils.debug(
           `msgTrackTimer Message response timeout msgNum ${i} retrying`,
@@ -490,8 +522,10 @@ export default class RICMsgHandler {
     }
 
     // Call again
-    this._msgTrackCheckTimer = setTimeout(async () => {
-      this._onMsgTrackTimer();
-    }, this._msgTrackTimerMs);
+    if (this._msgTrackTimerEnabled) {
+      this._msgTrackCheckTimer = setTimeout(async () => {
+        this._onMsgTrackTimer();
+      }, this._msgTrackTimerMs);
+    }
   }
 }

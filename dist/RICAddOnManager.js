@@ -9,8 +9,8 @@ export default class RICAddOnManager {
     clear() {
         this._addOnMap = {};
     }
-    convertHWElemType(whoAmITypeCode) {
-        return getHWElemTypeStr(whoAmITypeCode);
+    convertHWElemType(whoAmITypeCode, whoAmI) {
+        return getHWElemTypeStr(whoAmITypeCode, whoAmI);
     }
     getMappingOfAddOns(hwElems) {
         const addOnMap = {};

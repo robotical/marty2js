@@ -38,8 +38,8 @@ export default class RICAddOnManager {
   }
 
 
-  convertHWElemType(whoAmITypeCode: string | undefined){
-    return getHWElemTypeStr(whoAmITypeCode);
+  convertHWElemType(whoAmITypeCode: string | undefined, whoAmI: string | undefined){
+    return getHWElemTypeStr(whoAmITypeCode, whoAmI);
   } 
 
 

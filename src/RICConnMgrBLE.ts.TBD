@@ -1,0 +1,745 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// RICConnBLE
+// Communications Connector for RIC V2
+//
+// RIC V2
+// Rob Dobson 2021
+// (C) Robotical 2021
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import { EventEmitter } from 'events';
+import {
+    BleManager,
+    Device,
+    Subscription,
+    BleError,
+    Characteristic,
+    State,
+    // LogLevel,
+    ConnectionPriority,
+} from 'react-native-ble-plx';
+import { DiscoveredRIC, DiscoveryInterfaces, RICIFType, RICOKFail } from './RICTypes';
+import {
+    SCANNING_STARTED,
+    SCANNING_FINISHED,
+    VERIFYING_CORRECT_RIC,
+    CONNECTING_RIC,
+    CONNECTED_RIC,
+    DISCONNECTED_RIC,
+    RIC_REJECTED,
+    VERIFIED_CORRECT_RIC,
+    VERIFIED_CORRECT_RIC_PENDING,
+    CONNECTING_RIC_FAIL,
+    SET_RIC_NAME_START,
+    SET_RIC_NAME_SUCCESS,
+    SET_RIC_NAME_FAILED,
+    UPDATE_CANT_REACH_SERVER,
+    UPDATE_IS_AVAILABLE,
+    UPDATE_NOT_AVAILABLE,
+    UPDATE_FAILED,
+    UPDATE_SUCCESS_ALL,
+    UPDATE_SUCCESS_MAIN_ONLY,
+    UPDATE_PROGRESS,
+    UPDATE_STARTED,
+    UPDATE_CANCELLING,
+    BLUETOOTH_STATE,
+    SET_CALIBRATION_FLAG,
+} from '../../redux/actions/types';
+import RICMsgHandler from './RICMsgHandler';
+import RICUtils from './RICUtils';
+
+export default class RICConnMgrBLE extends EventEmitter {
+
+    // BLE manager and currently connected device
+    _bleManager: BleManager = null;
+    _bleDevice: Device | null = null;
+
+    // RIC to connect to
+    _ricToConnectTo: DiscoveredRIC | null = null;
+
+    // RIC msg handler
+    _ricMsgHandler: RICMsgHandler = null;
+
+    // Time to scan for
+    _discoveryTimeMs = 10000;
+
+    // Scanned devices
+    _discoveredRICs: DiscoveredRIC[] = [];
+    _scanInProgress = false;
+
+    // Reconnection
+    RECONNECT_ATTEMPTS_AFTER_CONN_LOST = 100000;
+
+    // MTU (Maximum Transmission Unit) size to request
+    MTU_SIZE_TO_REQUEST = 251;
+
+    // Verification of correct ble peripheral
+    _bleVerifColours: Array<string> = new Array<string>();
+    _bleVerifTimeoutMs = 10000;
+    _bleVerifRepeatMs = this._bleVerifTimeoutMs / 2.1;
+    _bleVerifActive = false;
+
+    // UUIDs
+    _RICServiceUUID = 'aa76677e-9cfd-4626-a510-0d305be57c8d';
+    _RICCmdUUID = 'aa76677e-9cfd-4626-a510-0d305be57c8e';
+    _RICRespUUID = 'aa76677e-9cfd-4626-a510-0d305be57c8f';
+    _uuidsOfServicesToScanFor = [this._RICServiceUUID];
+
+    // Event subscriptions
+    _bleSubscrOnRx: Subscription | null = null;
+    _bleSubscrOnDisconnect: Subscription | null = null;
+    _bleSubscrOnStateChange: Subscription | null = null;
+
+    // Callback to upper level
+    _onStateChangeListener: (ifType: RICIFType, stateChangeStr: string) => void = null;
+
+    constructor(msgHandler: RICMsgHandler) {
+        super();
+        this._ricMsgHandler = msgHandler;
+    }
+
+    setup() {
+        // Construct BLE manager and subscribe to onStateChange
+        this._bleManager = new BleManager();
+        // this._bleManager.setLogLevel(LogLevel.Verbose);
+
+        // Listen for BLE state changes
+        this._bleSubscrOnStateChange = this._bleManager.onStateChange(state => {
+            this._onBLEStateChange(state);
+        }, true);
+    }
+
+    onStateChange(listener: (ifType: RICIFType, stateChangeStr: string) => void) {
+        this._onStateChangeListener = listener;
+    }
+
+    // Mark: BLE State -----------------------------------------------------------------------------------------
+
+    _onBLEStateChange(state: State) {
+        console.log('BLE state change ' + state);
+        if (this._onStateChangeListener !== null) {
+            if (state === State.PoweredOn) {
+                this.emit(BLUETOOTH_STATE, {
+                    btEnabled: true,
+                });
+                console.log('BLE powered on');
+                this._onStateChangeListener(RICIFType.RIC_INTERFACE_BLE, "PoweredOn");
+            } else if (state === State.PoweredOff) {
+                this._onStateChangeListener(RICIFType.RIC_INTERFACE_BLE, "PoweredOff");
+                this.emit(BLUETOOTH_STATE, {
+                    btEnabled: false,
+                });
+
+            }
+        }
+    }
+
+    /**
+     * Get RIC connection status
+     *
+     * @returns boolean (true if connected)
+     *
+     */
+    async getIsConnected() {
+        if (this._bleDevice === null) {
+            return false;
+        }
+        return await this._bleDevice?.isConnected();
+    }
+
+    /**
+     * Get the RSSI of the currently connected device
+     *
+     *  @return number (or null if not connected)
+     *
+     */
+    async readRSSI(): Promise<number> {
+        if (this._bleDevice) {
+            const updatedDevice = await this._bleDevice.readRSSI();
+            if (updatedDevice.rssi !== null) {
+                return updatedDevice.rssi;
+            }
+        }
+        // is this a sensible default? should show up as a very weak signal
+        return -200;
+    }
+
+    // Mark: BLE Connect -----------------------------------------------------------------------------------------
+
+    /**
+     * Connect to a RIC
+     *
+     * @returns None
+     *
+     */
+    async connect(discoveredRIC: DiscoveredRIC): Promise<boolean> {
+        // Stop discovery
+        if (this._scanInProgress) {
+            this.emit(SCANNING_FINISHED, { discoveredRICs: this._discoveredRICs });
+        }
+        this._scanInProgress = false;
+        this._bleManager.stopDeviceScan();
+
+        // Now connecting
+        this.emit(CONNECTING_RIC, { deviceId: discoveredRIC.id });
+
+        // Connect
+        this._ricToConnectTo = discoveredRIC;
+        const connOk = await this._performDeviceConnection();
+
+        // Check if ok
+        if (!connOk) {
+            // Emit failure
+            this.emit(CONNECTING_RIC_FAIL);
+            return false;
+        }
+
+        // Emit success
+        this.emit(CONNECTED_RIC, {
+            deviceId: this._ricToConnectTo.id,
+            name: this._ricToConnectTo.name,
+        });
+        return true;
+    }
+
+    // Mark: BLE Disconnect -----------------------------------------------------------------------------------------
+
+    /**
+    * Disconnect from RIC
+    *
+    * @returns None
+    *
+    */
+    async disconnect(): Promise<void> {
+        // Stop the verification repeat
+        this._ricToConnectTo = null;
+        this._verificationRepeaterStop();
+
+        // Report disconnection
+        if (this._onStateChangeListener !== null)
+            this._onStateChangeListener(RICIFType.RIC_INTERFACE_BLE, "disconnected");
+
+        // console.log('WWWWWWWWWWWWWW disconnect() called');
+
+        // Remove disconnect subscription so it doesn't try to reconnect
+        if (this._bleSubscrOnDisconnect) {
+            this._bleSubscrOnDisconnect.remove();
+            this._bleSubscrOnDisconnect = null;
+        }
+
+        // // Find out if we are connected
+        // const isConnected = await this.getIsConnected();
+        // if (isConnected && this._bleDevice !== null) {
+        //   console.log(`🤖 Disconnect RIC user request`);
+        //   await this._bleDevice!.cancelConnection();
+        //   console.log(`✅ RIC disconnected`);
+        // }
+
+        // Disconnect anything we might be connected to
+        const connMarties = await this._bleManager.connectedDevices(
+            this._uuidsOfServicesToScanFor,
+        );
+        if (connMarties.length == 0) {
+            console.log('disconnect - no devices connected');
+        } else {
+            for (const connRIC of connMarties) {
+                console.log('Disconnecting ' + connRIC.id);
+                await this._bleManager.cancelDeviceConnection(connRIC.id);
+            }
+        }
+
+        // Clear connected device
+        console.log('disconnect clearing connected device');
+        this._bleDevice = null;
+    }
+
+    // Mark: Discovery --------------------------------------------------------------------------------------------
+
+    async discoveryStart(interfaces: DiscoveryInterfaces): Promise<boolean> {
+        // Handle discovery
+        console.log('discoveryStart');
+        if (
+            interfaces === DiscoveryInterfaces.DISCOVER_ANY ||
+            interfaces === DiscoveryInterfaces.DISCOVER_BLE_ONLY
+        ) {
+            // Clear list
+            this._discoveredRICs = [];
+
+            // Disconnect any connections
+            await this.disconnect();
+
+            // Start scan
+            console.log('startDeviceScan');
+            this._bleManager.startDeviceScan(
+                this._uuidsOfServicesToScanFor,
+                null,
+                (error: BleError | null, device: Device | null) => {
+                    console.log(`discoveryFoundCB error ${error}`);
+                    this._discoveryFoundCB(error, device);
+                },
+            );
+            this._scanInProgress = true;
+
+            // Set a time limit
+            this._discoverySetTimeLimit(this._discoveryTimeMs);
+
+            // Event
+            this.emit(SCANNING_STARTED);
+            return true;
+        }
+        console.log('discoveryStart failed');
+        return false;
+    }
+
+    discoveryCancel(): void {
+        console.log('discoveryCancel');
+        // Emit finished if we were scanning
+        if (this._scanInProgress) {
+            this.emit(SCANNING_FINISHED, { discoveredRICs: this._discoveredRICs });
+        }
+        // Cancel discovery
+        this._bleManager.stopDeviceScan();
+        this._scanInProgress = false;
+    }
+
+    // Mark: Verification -----------------------------------------------------------------------------------------
+
+    async verificationStart(RICToConnectTo: DiscoveredRIC): Promise<boolean> {
+        // Try to connect to RIC
+        console.log('verificationStart');
+        const success = await this.connect(RICToConnectTo);
+        if (!success) {
+            console.log('verificationStart is NOT connected');
+            return false;
+        }
+
+        const availableColors = [
+            { led: '#202000', lcd: '#FFFF00' },
+            { led: '#202020', lcd: '#FFFFFF' },
+            { led: '#000040 ', lcd: '#0080FF' },
+        ];
+
+        // Random colour selection
+        const LED_1 =
+            availableColors[Math.floor(Math.random() * availableColors.length)];
+        const LED_2 =
+            availableColors[Math.floor(Math.random() * availableColors.length)];
+        const LED_3 =
+            availableColors[Math.floor(Math.random() * availableColors.length)];
+
+        // LED and LCD colours are different to attempt to be visually similar
+        const LED_COLORS = [LED_1.led, LED_2.led, LED_3.led];
+        const LCD_COLORS = [LED_1.lcd, LED_2.lcd, LED_3.lcd];
+        // Emit event to tell UI to display LCD colours
+        this.emit(VERIFYING_CORRECT_RIC, {
+            bondingColors: LCD_COLORS,
+            deviceId: RICToConnectTo.id,
+        });
+
+        // Set the colours to display on LEDs
+        this._bleVerifColours = LED_COLORS;
+        this._bleVerifActive = true;
+
+        // Start verification repeat
+        await this._verificationRepeat();
+        return true;
+    }
+
+    async verificationStop(remainConnected: boolean): Promise<void> {
+        // Stop the verification repeat
+        this._verificationRepeaterStop();
+        console.log('verificationStop');
+
+        // Check if we want to disconnect
+        if (!remainConnected) {
+            this.emit(RIC_REJECTED);
+            await this.disconnect();
+        } else {
+            if (this._bleDevice !== null) {
+                this.emit(VERIFIED_CORRECT_RIC_PENDING, {});
+
+                // Now connected
+                if (this._onStateChangeListener !== null) {
+                    this._onStateChangeListener(RICIFType.RIC_INTERFACE_BLE, "connected");
+                }
+            }
+        }
+    }
+
+    // Mark: Discovery Helpers -----------------------------------------------------------------------------------------
+
+    // Callback from BLE-PLX library on device discovered
+    _discoveryFoundCB(
+        error: BleError | null,
+        scannedDevice: Device | null,
+    ): void {
+        console.log('✅ Scanning... >> ', { scannedDevice });
+        if (error) {
+            console.log('⚠️ Scan Error >> ', { error });
+            // Event if we were scanning
+            if (this._scanInProgress) {
+                this.emit(SCANNING_FINISHED, {
+                    discoveredRICs: this._discoveredRICs,
+                });
+                this._scanInProgress = false;
+            }
+            return;
+        }
+
+        // See if already in the list
+        const ricAlreadyFound = this._discoveredRICs.find(
+            item => item.id === scannedDevice!.id,
+        );
+
+        if (ricAlreadyFound) {
+            return;
+        }
+
+        if (scannedDevice !== null) {
+            this._discoveredRICs.push(
+                new DiscoveredRIC(
+                    scannedDevice.localName !== null ? scannedDevice.localName : '',
+                    scannedDevice.name !== null ? scannedDevice.name : '',
+                    scannedDevice.id,
+                    scannedDevice.rssi !== null ? scannedDevice.rssi : -150,
+                ),
+            );
+        }
+        console.log('🤖 Scanned RICs >> ', this._discoveredRICs);
+    }
+
+    // Time-limit on device scanning
+    _discoverySetTimeLimit(timeLimitMs: number) {
+        setTimeout(() => {
+            // Stop scanning
+            this._bleManager.stopDeviceScan();
+
+            // Check we were scanning
+            if (this._scanInProgress) {
+                // Sort by signal strength
+                this._discoveredRICs.sort((a, b) => {
+                    return b!.rssi! - a!.rssi!;
+                });
+
+                // Debug
+                const msg = `🤖 ${this._discoveredRICs.length} RICs found! Choose one to connect`;
+                console.log(msg);
+
+                // Finished event
+                this.emit(SCANNING_FINISHED, {
+                    discoveredRICs: this._discoveredRICs,
+                });
+            }
+            this._scanInProgress = false;
+        }, timeLimitMs);
+    }
+
+    // Mark: Connection helpers -----------------------------------------------------------------------------------------
+
+    // Perform device connection
+    async _performDeviceConnection(): Promise<boolean> {
+        // Check there is a RIC to connect to
+        if (this._ricToConnectTo === null) {
+            return false;
+        }
+
+        let deviceConnected = null;
+        for (let connRetry = 0; connRetry < 5; connRetry++) {
+            try {
+                deviceConnected = await this._bleManager.connectToDevice(
+                    this._ricToConnectTo.id,
+                    {
+                        timeout: 3000,
+                    },
+                );
+                break;
+            } catch (error) {
+                console.log(
+                    'connectToDevice failed at attempt',
+                    connRetry + 1,
+                    'error',
+                    error,
+                );
+                deviceConnected = null;
+            }
+        }
+        if (deviceConnected === null) {
+            this.emit(CONNECTING_RIC_FAIL);
+            return false;
+        }
+
+        // Request high-priority connection
+        try {
+            await this._bleManager.requestConnectionPriorityForDevice(
+                this._ricToConnectTo.id,
+                ConnectionPriority.High,
+            );
+        } catch (error) {
+            this.emit(CONNECTING_RIC_FAIL);
+            console.log('requestConnectionPriorityForDevice failed', error);
+            return false;
+        }
+
+        // Increase MTU size
+        try {
+            if (deviceConnected) {
+                await deviceConnected.requestMTU(this.MTU_SIZE_TO_REQUEST);
+            }
+        } catch (error) {
+            this.emit(CONNECTING_RIC_FAIL);
+            console.log('requestMTU failed', error);
+            return false;
+        }
+
+        // Discover services and characteristics
+        try {
+            if (deviceConnected) {
+                this._bleDevice = await deviceConnected.discoverAllServicesAndCharacteristics();
+            }
+        } catch (error) {
+            this.emit(CONNECTING_RIC_FAIL);
+            console.log('discoverAllServicesAndCharacteristics failed', error);
+            return false;
+        }
+
+        // const characteristics = await deviceConnectedInitalised.characteristicsForService(
+        //   this._RICServiceUUID,
+        // );
+
+        // Monitor the inbound characteristic
+        try {
+            if (this._bleDevice) {
+                this._bleSubscrOnRx = this._bleDevice.monitorCharacteristicForService(
+                    this._RICServiceUUID,
+                    this._RICRespUUID,
+                    (error: BleError | null, characteristic: Characteristic | null) => {
+                        this._onMsgRx(error, characteristic);
+                    },
+                );
+            }
+        } catch (error) {
+            this.emit(CONNECTING_RIC_FAIL);
+            console.log('monitorCharacteristicForService failed', error);
+            return false;
+        }
+
+        // Deal with future disconnections
+        this._handleLostConnections();
+
+        return true;
+    }
+
+    // Handle lost connections
+    _handleLostConnections(): void {
+        // console.log('YYYYYYYYYY subscribing to onDisconnected');
+        // Check device ok
+        if (this._bleDevice === null) {
+            return;
+        }
+
+        // Attach a disconnected listener
+        this._bleSubscrOnDisconnect = this._bleManager.onDeviceDisconnected(
+            this._bleDevice.id,
+            async () => {
+                // console.log('XXXXXXXXXXX lostConnection');
+                // Report disconnection
+                if (this._onStateChangeListener !== null)
+                    this._onStateChangeListener(RICIFType.RIC_INTERFACE_BLE, "disconnected");
+                try {
+                    if (this._bleSubscrOnRx) {
+                        this._bleSubscrOnRx.remove();
+                        this._bleSubscrOnRx = null;
+                    }
+
+                    if (this._bleSubscrOnDisconnect) {
+                        this._bleSubscrOnDisconnect.remove();
+                        this._bleSubscrOnDisconnect = null;
+                    }
+
+                    // Debug
+                    console.log(`connection subscriptions removed`);
+
+                    // Stop the timer which sets bonding colours
+                    // this._verificationRepeaterStop();
+
+                    // Device now null
+                    console.log('onDisconnect clearing connected device');
+                    this._bleDevice = null;
+                } catch (error) {
+                    console.log('Error in onDisconnected', error);
+                }
+
+                // Attempt reconnection
+                for (
+                    let reconnAttempt = 0;
+                    reconnAttempt < this.RECONNECT_ATTEMPTS_AFTER_CONN_LOST;
+                    reconnAttempt++
+                ) {
+                    // console.log(
+                    //   `ZZZZZZZZZZZZZZZZZZZZ attempting reconnection #`,
+                    //   reconnAttempt,
+                    // );
+                    if (await this._performDeviceConnection()) {
+                        // console.log('ZZZZZZZZZZZZZZZZZ reconnected OK');
+                        return;
+                    }
+                }
+
+                // Give up trying to reconnect
+                // console.log(`QQQQQQQQQQQQQQQQQQQQ giving up on reconnection`);
+                // this.emit(DISCONNECTED_RIC, {});
+            },
+        );
+    }
+
+    // Mark: Verification Helpers -----------------------------------------------------------------------------------------
+
+    /**
+     *
+     * Bonding colour helper
+     * @returns promise boolean
+     *
+     */
+    async _verificationRepeat(): Promise<boolean> {
+        try {
+            // Check active
+            if (!this._bleVerifActive) {
+                console.log('_verificationRepeat IS NOT ACTIVE - returning');
+                return false;
+            }
+
+            // Check connected
+            const isConnected = await this.getIsConnected();
+            if (!isConnected) {
+                console.log('_verificationRepeat IS NOT CONNECTED - returning');
+                return false;
+            }
+
+            // Set bonding colours
+            let colourSetStr = '';
+            for (let i = 0; i < this._bleVerifColours.length; i++) {
+                if (i != 0) {
+                    colourSetStr += '&';
+                }
+                let colr = this._bleVerifColours[i];
+                if (colr.startsWith('#')) colr = colr.slice(1);
+                colourSetStr += `c${i}=${colr}`;
+            }
+            try {
+                console.log('_verificationRepeat setting colours');
+                await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+                    `indicator/set?${colourSetStr}&ms=${this._bleVerifTimeoutMs}`,
+                    false,
+                );
+            } catch (error) {
+                console.log('_verificationRepeat ERROR > ', JSON.stringify(error));
+                console.log(`_verificationRepeat failed to set LED colours` + error);
+            }
+
+            // Set timer to repeat message
+            console.log('Setting timeout for _verificationRepeat');
+            setTimeout(async () => {
+                await this._verificationRepeat();
+            }, this._bleVerifRepeatMs);
+        } catch (error) {
+            console.log(`_verificationRepeaterStart failed to start ${error}`);
+            return false;
+        }
+        return true;
+    }
+
+    _verificationRepeaterStop(): void {
+        this._bleVerifActive = false;
+        // Send message to clear LEDs
+        setTimeout(async () => {
+            try {
+                if (await this.getIsConnected()) {
+                    await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(
+                        `indicator/resume`,
+                        false,
+                    );
+                }
+            } catch (error) {
+                console.log('_verificationRepeaterStop failed to send', error);
+            }
+        }, 1);
+    }
+
+    // Mark: BLE message handling -----------------------------------------------------------------------------------------
+
+    async sendTxMsg(msg: Uint8Array, sendWithResponse: boolean): Promise<void> {
+        // Check valid
+        if (this._bleDevice === null) {
+          return;
+        }
+    
+        // Convert to Base64
+        const msgFrameBase64 = RICUtils.btoa(msg);
+    
+        // Write to the characteristic
+        if (sendWithResponse) {
+          // console.log('sendFrame withResponse');
+          await this._bleDevice.writeCharacteristicWithResponseForService(
+            this._RICServiceUUID,
+            this._RICCmdUUID,
+            msgFrameBase64!,
+          );
+        } else {
+          // console.log('sendFrame withoutResponse');
+          await this._bleDevice.writeCharacteristicWithoutResponseForService(
+            this._RICServiceUUID,
+            this._RICCmdUUID,
+            msgFrameBase64!,
+          );
+        }
+      }
+    
+      async sendTxMsgNoAwait(
+        msg: Uint8Array,
+        sendWithResponse: boolean,
+      ): Promise<Characteristic> {
+        // Convert to Base64
+        const msgFrameBase64 = RICUtils.btoa(msg);
+    
+        // Write to the characteristic
+        if (sendWithResponse) {
+          // console.log('sendFrame withResponse');
+          return this._bleDevice!.writeCharacteristicWithResponseForService(
+            this._RICServiceUUID,
+            this._RICCmdUUID,
+            msgFrameBase64!,
+          );
+        } else {
+          // console.log('sendFrame withoutResponse');
+          return this._bleDevice!.writeCharacteristicWithoutResponseForService(
+            this._RICServiceUUID,
+            this._RICCmdUUID,
+            msgFrameBase64!,
+          );
+        }
+      }
+    
+    _onMsgRx(error: BleError | null, characteristic: Characteristic | null) {
+        if (error) {
+            // this.emit(maybe dont want to emit here - just add to comms stats?);
+            // this.reportError(error.message);
+            return;
+        }
+
+        // Extract message
+        const msgFrameBase64 = characteristic!.value;
+        //@ts-ignore
+        const rxFrame = RICUtils.atob(msgFrameBase64);
+
+        // Debug
+        // console.log('_onMsgRx from BLE ' + RICUtils.bufferToHex(rxFrame));
+
+        // Send
+        if (rxFrame !== null) {
+            this._ricMsgHandler.handleNewRxMsg(rxFrame);
+        }
+    }
+
+}

@@ -98,8 +98,9 @@ export class RICCalibInfo {
     }
 }
 export class RICOKFail {
-    constructor() {
+    constructor(rsltFlag = undefined) {
         this.rslt = 'commsFail';
+        this.set(rsltFlag === undefined ? false : rsltFlag);
     }
     set(rsltFlag) {
         if (rsltFlag) {
@@ -215,3 +216,12 @@ export var RICEvent;
     RICEvent[RICEvent["UPDATE_CANCELLING"] = 17] = "UPDATE_CANCELLING";
 })(RICEvent || (RICEvent = {}));
 ;
+export var RICLogLevel;
+(function (RICLogLevel) {
+    RICLogLevel[RICLogLevel["NONE"] = 0] = "NONE";
+    RICLogLevel[RICLogLevel["ERROR"] = 1] = "ERROR";
+    RICLogLevel[RICLogLevel["WARN"] = 2] = "WARN";
+    RICLogLevel[RICLogLevel["INFO"] = 3] = "INFO";
+    RICLogLevel[RICLogLevel["DEBUG"] = 4] = "DEBUG";
+    RICLogLevel[RICLogLevel["VERBOSE"] = 5] = "VERBOSE";
+})(RICLogLevel || (RICLogLevel = {}));

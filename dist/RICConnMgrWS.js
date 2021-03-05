@@ -113,13 +113,9 @@ export default class RICConnMgrWS {
             // Discard connect info
             this._ricToConnectTo = null;
             // Disconnect websocket
-            (_a = this._webSocket) === null || _a === void 0 ? void 0 : _a.close();
-            // Report disconnection
-            if (this._onStateChangeListener !== null) {
-                this._onStateChangeListener(RICEvent.DISCONNECTED_RIC, {
-                    ifType: RICIFType.RIC_INTERFACE_WIFI,
-                });
-            }
+            (_a = this._webSocket) === null || _a === void 0 ? void 0 : _a.close(1000);
+            // Debug
+            RICUtils.debug(`Attempting to close websocket`);
         });
     }
     _performDeviceConnection() {
@@ -135,27 +131,45 @@ export default class RICConnMgrWS {
             // Form websocket address
             const wsURL = "ws://" + this._ricToConnectTo._hostnameOrIPAddress + "/ws";
             // Connect to websocket
-            try {
-                this._webSocket = yield this.webSocketOpen(wsURL);
-            }
-            catch (error) {
-                RICUtils.debug(`Unable to create WebSocket ${error.toString()}`);
-                return false;
-            }
-            this._webSocket.onmessage = (evt) => {
-                // RICUtils.debug("WebSocket rx");
-                if (evt.data instanceof ArrayBuffer) {
-                    const msg = new Uint8Array(evt.data);
-                    this._onMsgRx(msg);
-                }
-            };
-            this._webSocket.onclose = (evt) => {
-                RICUtils.debug('Websocket connection closed ' + evt.toString());
-                this._webSocket = null;
-                this._webSocketIsConnected = false;
-            };
-            // Ok
-            return true;
+            // try {
+            //     this._webSocket = await this.webSocketOpen(wsURL);
+            // } catch (error) {
+            //     RICUtils.debug(`Unable to create WebSocket ${error.toString()}`);
+            //     return false;
+            // }
+            this._webSocket = null;
+            return new Promise((resolve, reject) => {
+                this.webSocketOpen(wsURL).then((ws) => {
+                    this._webSocket = ws;
+                    RICUtils.debug("WS connection opened");
+                    // Handle messages
+                    this._webSocket.onmessage = (evt) => {
+                        // RICUtils.debug("WebSocket rx");
+                        if (evt.data instanceof ArrayBuffer) {
+                            const msg = new Uint8Array(evt.data);
+                            this._onMsgRx(msg);
+                        }
+                    };
+                    // Handle close event
+                    this._webSocket.onclose = (evt) => {
+                        RICUtils.info(`Websocket connection closed code ${evt.code} wasClean ${evt.wasClean} reason ${evt.reason}`);
+                        this._webSocket = null;
+                        this._webSocketIsConnected = false;
+                        // Report disconnection
+                        if (this._onStateChangeListener !== null) {
+                            this._onStateChangeListener(RICEvent.DISCONNECTED_RIC, {
+                                ifType: RICIFType.RIC_INTERFACE_WIFI,
+                            });
+                        }
+                    };
+                    // Resolve the promise - success
+                    resolve(true);
+                }).catch((err) => {
+                    RICUtils.verbose(`WS open failed ${err}`);
+                    // Resolve - failed
+                    reject(false);
+                });
+            });
         });
     }
     webSocketOpen(url) {
@@ -168,14 +182,14 @@ export default class RICConnMgrWS {
                     const webSocket = new WebSocket(url);
                     // Open socket
                     webSocket.binaryType = "arraybuffer";
-                    webSocket.onopen = (evt) => {
-                        RICUtils.debug('WebSocket connection opened ' + evt.toString());
+                    webSocket.onopen = (_evt) => {
+                        RICUtils.debug('WebSocket connection opened');
                         // // We're connected
                         this._webSocketIsConnected = true;
                         resolve(webSocket);
                     };
                     webSocket.onerror = function (evt) {
-                        RICUtils.warn('Websocket error: ' + evt.toString());
+                        RICUtils.warn(`Websocket error: ${evt.message}`);
                         reject(evt);
                     };
                 }
@@ -194,7 +208,7 @@ export default class RICConnMgrWS {
             if (!this._webSocketIsConnected)
                 return;
             // Debug
-            // RICUtils.debug("sendTxMsg " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
+            RICUtils.verbose("sendTxMsg " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
             // Send over websocket
             yield ((_a = this._webSocket) === null || _a === void 0 ? void 0 : _a.send(msg));
         });
@@ -207,14 +221,16 @@ export default class RICConnMgrWS {
             if (!this._webSocketIsConnected)
                 return;
             // Debug
-            // RICUtils.debug("sendTxMsgNoAwait " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
+            RICUtils.verbose("sendTxMsgNoAwait " + msg.toString() + " sendWithResp " + sendWithResponse.toString());
             // Send over websocket
             (_a = this._webSocket) === null || _a === void 0 ? void 0 : _a.send(msg);
         });
     }
     _onMsgRx(msg) {
         // Debug
-        // RICUtils.debug('_onMsgRx ' + RICUtils.bufferToHex(msg));
+        if (msg !== null) {
+            RICUtils.verbose('_onMsgRx ' + RICUtils.bufferToHex(msg));
+        }
         // Handle message
         if (msg !== null && this._ricMsgHandler) {
             this._ricMsgHandler.handleNewRxMsg(msg);

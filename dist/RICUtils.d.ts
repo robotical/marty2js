@@ -1,6 +1,9 @@
+import { RICLogLevel, RICLogFn } from "./RICTypes.js";
 export default class RICUtils {
     static _isEndianSet: boolean;
     static _isLittleEndian: boolean;
+    static _logListener: RICLogFn | null;
+    static _logLevel: RICLogLevel;
     /**
      *
      * Add a string to a Uint8Array buffer
@@ -97,4 +100,8 @@ export default class RICUtils {
     static info(msg: string): void;
     static warn(msg: string): void;
     static error(msg: string): void;
+    static verbose(msg: string): void;
+    static setLogListener(listener: RICLogFn | null): void;
+    static setLogLevel(logLevel: RICLogLevel): void;
+    static doLogging(logLevel: RICLogLevel, msg: string): boolean;
 }

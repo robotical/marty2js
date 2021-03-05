@@ -4,7 +4,7 @@ import CommsStats from './CommsStats.js';
 import RICAddOnManager from './RICAddOnManager.js';
 import RICConnManager from './RICConnManager.js';
 import { ROSSerialSmartServos, ROSSerialIMU, ROSSerialPowerStatus, ROSSerialAddOnStatusList } from './RICROSSerial.js';
-import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType, RICEventIF } from './RICTypes.js';
+import { RICDiscoveryListener, DiscoveredRIC, RICFileSendType, RICSystemInfo, RICNameResponse, RICStateInfo, RICUpdateInfo, RICOKFail, RICFileList, RICCalibInfo, RICHWElemList, RICAddOnList, RICHWElem, RICConnEventArgs, RICEvent, RICCmdParams, RICFetchBlobFnType, RICEventIF, RICLogFn, RICLogLevel } from './RICTypes.js';
 export declare class Marty {
     _ricEventListener: RICEventIF | null;
     _systemInfo: RICSystemInfo | null;
@@ -49,7 +49,11 @@ export declare class Marty {
     constructor();
     setEventListener(listener: RICEventIF): void;
     removeEventListener(): void;
+    getEventStr(connEvent: RICEvent): string;
     setFetchBlobCallback(fetchBlobFn: RICFetchBlobFnType): void;
+    setLogListener(listener: RICLogFn): void;
+    removeLogListener(): void;
+    setLogLevel(logLevel: RICLogLevel): void;
     /**
      * Connect to a RIC
      *
@@ -137,13 +141,13 @@ export declare class Marty {
     runTrajectory(trajName: string, params: RICCmdParams): Promise<RICOKFail>;
     /**
      *
-     * runTrajectory
-     * @param commandName command API string
-     * @param params parameters (simple name value pairs only) to parameterize trajectory
+     * runCommand
+     * @param restCmdOrJsonCmd command REST API string OR JSON command string
+     * @param params parameters (simple name value pairs only) to parameterize command (e.g. trajectory parameters)
      * @returns Promise<RICOKFail>
      *
      */
-    runCommand(commandName: string, params: RICCmdParams): Promise<RICOKFail>;
+    runCommand(restCmdOrJsonCmd: string, params: RICCmdParams): Promise<RICOKFail>;
     /**
      *
      * hwElemFirmwareUpdate - initiate firmware update of one or more HWElems
@@ -151,7 +155,7 @@ export declare class Marty {
      *
      */
     hwElemFirmwareUpdate(): Promise<RICOKFail>;
-    convertHWElemType(whoAmITypeCode: string | undefined): string;
+    convertHWElemType(whoAmITypeCode: string | undefined, whoAmI: string | undefined): string;
     /**
      *
      * getHWElemList - get list of HWElems on the robot (including add-ons)
@@ -191,7 +195,7 @@ export declare class Marty {
      * @returns Promise<boolean>
      *
      */
-    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback: (sent: number, total: number, progress: number) => void): Promise<boolean>;
+    fileSend(fileName: string, fileType: RICFileSendType, fileContents: Uint8Array, progressCallback?: ((sent: number, total: number, progress: number) => void) | undefined): Promise<boolean>;
     fileSendCancel(): Promise<void>;
     calibrate(cmd: string, joints: string): Promise<RICOKFail | undefined>;
     getCachedSystemInfo(): RICSystemInfo | null;
@@ -199,7 +203,7 @@ export declare class Marty {
     getCachedCalibInfo(): RICCalibInfo | null;
     getCachedRICName(): string | null;
     getCachedRICNameIsSet(): boolean;
-    checkForUpdate(): Promise<void>;
+    checkForUpdate(): Promise<boolean>;
     _isUpdateRequired(latestVersion: RICUpdateInfo, systemInfo: RICSystemInfo | null): Promise<boolean>;
     firmwareUpdate(): Promise<void>;
     firmwareUpdateCancel(): Promise<void>;

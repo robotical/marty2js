@@ -52,6 +52,7 @@ export declare class RICCalibInfo {
     calDone: number;
 }
 export declare class RICOKFail {
+    constructor(rsltFlag?: boolean | undefined);
     set(rsltFlag: boolean): void;
     rslt: string;
 }
@@ -206,3 +207,12 @@ export interface RICEventIF {
     onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
     onConnEvent: RICConnEventFn;
 }
+export declare enum RICLogLevel {
+    NONE = 0,
+    ERROR = 1,
+    WARN = 2,
+    INFO = 3,
+    DEBUG = 4,
+    VERBOSE = 5
+}
+export declare type RICLogFn = (logLevel: RICLogLevel, msg: string) => void;

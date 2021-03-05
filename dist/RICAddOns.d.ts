@@ -10,7 +10,7 @@ export declare const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE = "00000089";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE = "0000008A";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO = "0000008B";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2 = "0000008C";
-export declare function getHWElemTypeStr(whoAmITypeCode: string | undefined): string;
+export declare function getHWElemTypeStr(whoAmITypeCode: string | undefined, whoAmI: string | undefined): string;
 export declare class RICAddOnBase {
     _name: string;
     _deviceTypeID: number;

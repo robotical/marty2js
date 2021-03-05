@@ -162,7 +162,7 @@ const ADDON_NOISESENSOR_FORMAT_DEF = {
         },
     ],
 };
-export function getHWElemTypeStr(whoAmITypeCode) {
+export function getHWElemTypeStr(whoAmITypeCode, whoAmI) {
     RICUtils.debug(`getting type code for ${whoAmITypeCode}`);
     if (whoAmITypeCode === undefined) {
         return `Undefined whoamiTypeCode`;
@@ -189,7 +189,7 @@ export function getHWElemTypeStr(whoAmITypeCode) {
         case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
             return 'LightSensor';
     }
-    return `Unknown (${whoAmITypeCode})`;
+    return `Unknown (${whoAmI} - ${whoAmITypeCode})`;
 }
 export class RICAddOnBase {
     constructor(name) {
@@ -226,6 +226,7 @@ export class RICAddOnLEDFoot extends RICAddOnBase {
     processPublishedData(addOnID, statusByte) {
         // Status to return
         const retStatus = new ROSSerialAddOnStatus();
+        // console.log("RICADDONMANAGER: debugging info");
         // Extract data
         retStatus.id = addOnID;
         retStatus.deviceTypeID = this._deviceTypeID;

@@ -114,7 +114,10 @@ export class RICCalibInfo {
 }
 
 export class RICOKFail {
-    set(rsltFlag: boolean) {
+    constructor(rsltFlag: boolean | undefined = undefined) {
+        this.set(rsltFlag === undefined ? false : rsltFlag);
+    }
+    set(rsltFlag: boolean): void {
         if (rsltFlag) {
             this.rslt = 'ok';
         } else {
@@ -323,3 +326,14 @@ export interface RICEventIF {
     onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
     onConnEvent: RICConnEventFn;
 }
+
+export enum RICLogLevel {
+    NONE,
+    ERROR,
+    WARN,
+    INFO,
+    DEBUG,
+    VERBOSE
+}
+
+export type RICLogFn = (logLevel: RICLogLevel, msg: string) => void;

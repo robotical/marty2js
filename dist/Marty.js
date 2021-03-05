@@ -111,9 +111,25 @@ export class Marty {
     removeEventListener() {
         this._ricEventListener = null;
     }
+    // Get event string
+    getEventStr(connEvent) {
+        return (RICEvent[connEvent]);
+    }
     // Set a callback to handle "fetch-blob" requests
     setFetchBlobCallback(fetchBlobFn) {
         this._fetchBlobFn = fetchBlobFn;
+    }
+    // Set log listener
+    setLogListener(listener) {
+        RICUtils.setLogListener(listener);
+    }
+    // Remove log listener
+    removeLogListener() {
+        RICUtils.setLogListener(null);
+    }
+    // Set log level
+    setLogLevel(logLevel) {
+        RICUtils.setLogLevel(logLevel);
     }
     // Mark: Connection -----------------------------------------------------------------------------------------
     /**
@@ -125,7 +141,57 @@ export class Marty {
     connect(discoveredRIC) {
         return __awaiter(this, void 0, void 0, function* () {
             // Request connection
-            return yield this._connManager.connect(discoveredRIC);
+            const connRslt = yield this._connManager.connect(discoveredRIC);
+            if (!connRslt) {
+                this._reportConnEvent(RICEvent.CONNECTING_RIC_FAIL, {});
+                return false;
+            }
+            // Open message handler
+            this._ricMsgHandler.open();
+            // Get system info
+            try {
+                this._systemInfo = yield this.getRICSystemInfo();
+                RICUtils.debug(`eventConnect - RIC Version ${this._systemInfo.SystemVersion}`);
+            }
+            catch (error) {
+                RICUtils.warn('eventConnect - failed to get version ' + error);
+            }
+            // Get RIC name
+            try {
+                yield this.getRICName();
+            }
+            catch (error) {
+                RICUtils.warn('eventConnect - failed to get RIC name ' + error);
+            }
+            // Get calibration info
+            try {
+                this._calibInfo = yield this.getRICCalibInfo();
+            }
+            catch (error) {
+                RICUtils.warn('eventConnect - failed to get calib info ' + error);
+            }
+            // Get HWElems (connected to RIC)
+            try {
+                yield this.getHWElemList();
+            }
+            catch (error) {
+                RICUtils.warn('eventConnect - failed to get HWElems ' + error);
+            }
+            // Subscribe for updates
+            try {
+                yield this.subscribeForUpdates(true);
+            }
+            catch (error) {
+                RICUtils.warn(`eventConnect - subscribe for updates failed ${error.toString()}`);
+            }
+            // RIC verified and connected
+            const connEventArgs = {
+                systemInfo: this._systemInfo ? this._systemInfo : undefined
+            };
+            this._reportConnEvent(RICEvent.CONNECTED_RIC, connEventArgs);
+            // Debug
+            RICUtils.debug(`Connected RIC called ${this._ricFriendlyName}`);
+            return true;
         });
     }
     /**
@@ -138,6 +204,7 @@ export class Marty {
         return __awaiter(this, void 0, void 0, function* () {
             // Request disconnection
             yield this._connManager.disconnect();
+            this._ricMsgHandler.close();
         });
     }
     // Mark: Robot Control ------------------------------------------------------------------------------------
@@ -255,11 +322,11 @@ export class Marty {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const ricSystemInfo = yield this._ricMsgHandler.sendRICRESTURL('v', true);
-                RICUtils.debug('getRICSystemInfo returned ' + ricSystemInfo);
+                RICUtils.debug(`getRICSystemInfo returned ${JSON.stringify(ricSystemInfo)}`);
                 return ricSystemInfo;
             }
             catch (error) {
-                RICUtils.warn('getRICSystemInfo Failed to get version' + error.toString());
+                RICUtils.warn(`getRICSystemInfo Failed to get version ${error.toString()}`);
                 return new RICSystemInfo();
             }
         });
@@ -275,11 +342,11 @@ export class Marty {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const ricCalibInfo = yield this._ricMsgHandler.sendRICRESTURL('calibrate', true);
-                RICUtils.debug('getRICCalibInfo returned ' + ricCalibInfo);
+                RICUtils.debug(`getRICCalibInfo returned ${JSON.stringify(ricCalibInfo)}`);
                 return ricCalibInfo;
             }
             catch (error) {
-                RICUtils.warn('getRICCalibInfo Failed to get version' + error.toString());
+                RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
                 return new RICCalibInfo();
             }
         });
@@ -350,32 +417,96 @@ export class Marty {
     // Mark: Run API Command -------------------------------------------------------------------------------
     /**
      *
-     * runTrajectory
-     * @param commandName command API string
-     * @param params parameters (simple name value pairs only) to parameterize trajectory
+     * runCommand
+     * @param restCmdOrJsonCmd command REST API string OR JSON command string
+     * @param params parameters (simple name value pairs only) to parameterize command (e.g. trajectory parameters)
      * @returns Promise<RICOKFail>
      *
      */
-    runCommand(commandName, params) {
+    runCommand(restCmdOrJsonCmd, params) {
         return __awaiter(this, void 0, void 0, function* () {
-            try {
-                // Format the paramList as query string
-                const paramEntries = this._objectEntries(params);
-                let paramQueryStr = '';
-                for (const param of paramEntries) {
-                    if (paramQueryStr.length > 0)
-                        paramQueryStr += '&';
-                    paramQueryStr += param[0] + '=' + param[1];
-                }
-                // Format the url to send
-                if (paramQueryStr.length > 0)
-                    commandName += '?' + paramQueryStr;
-                return yield this._ricMsgHandler.sendRICRESTURL(commandName, true);
-            }
-            catch (error) {
-                RICUtils.warn('runCommand failed' + error.toString());
+            if (restCmdOrJsonCmd == null) {
                 return new RICOKFail();
             }
+            // Check if this is in JSON format
+            if (restCmdOrJsonCmd.startsWith('{')) {
+                try {
+                    const msgContent = JSON.parse(restCmdOrJsonCmd);
+                    if (msgContent.command === 'listFiles') {
+                        try {
+                            // TODO
+                        }
+                        catch (error) {
+                            return new RICOKFail();
+                        }
+                    }
+                    else if (msgContent.command === 'saveFile') {
+                        try {
+                            // TODO
+                        }
+                        catch (error) {
+                            return new RICOKFail();
+                        }
+                    }
+                    else if (msgContent.command === 'deleteFile') {
+                        try {
+                            // TODO
+                        }
+                        catch (error) {
+                            return new RICOKFail();
+                        }
+                    }
+                    else if (msgContent.command === 'loadFile') {
+                        try {
+                            // TODO
+                        }
+                        catch (error) {
+                            return new RICOKFail();
+                        }
+                    }
+                    else if (msgContent.command === 'playRawSound') {
+                        try {
+                            const soundData = RICUtils.atob(msgContent.soundData);
+                            if (soundData === null)
+                                return new RICOKFail();
+                            const fsResult = yield this.fileSend("__tmpsnd.raw", RICFileSendType.RIC_NORMAL_FILE, soundData);
+                            if (fsResult) {
+                                this.fileRun("__tmpsnd.raw");
+                            }
+                            return new RICOKFail(fsResult);
+                        }
+                        catch (err) {
+                            console.log("Send failed", err);
+                        }
+                        return new RICOKFail();
+                    }
+                }
+                catch (error) {
+                    RICUtils.warn('runCommand failed to parse JSON ' + error.toString());
+                    return new RICOKFail();
+                }
+            }
+            else {
+                try {
+                    // Format the paramList as query string
+                    const paramEntries = this._objectEntries(params);
+                    let paramQueryStr = '';
+                    for (const param of paramEntries) {
+                        if (paramQueryStr.length > 0)
+                            paramQueryStr += '&';
+                        paramQueryStr += param[0] + '=' + param[1];
+                    }
+                    // Format the url to send
+                    if (paramQueryStr.length > 0)
+                        restCmdOrJsonCmd += '?' + paramQueryStr;
+                    return yield this._ricMsgHandler.sendRICRESTURL(restCmdOrJsonCmd, true);
+                }
+                catch (error) {
+                    RICUtils.warn('runCommand failed' + error.toString());
+                    return new RICOKFail();
+                }
+            }
+            return new RICOKFail();
         });
     }
     // Mark: Firmware update of hardware element(s) -----------------------------------------------------------
@@ -397,8 +528,8 @@ export class Marty {
         });
     }
     //get the name of the addons type from the type code
-    convertHWElemType(whoAmITypeCode) {
-        return this._addOnManager.convertHWElemType(whoAmITypeCode);
+    convertHWElemType(whoAmITypeCode, whoAmI) {
+        return this._addOnManager.convertHWElemType(whoAmITypeCode, whoAmI);
     }
     // Mark: Get HWElem list -----------------------------------------------------------
     /**
@@ -494,9 +625,9 @@ export class Marty {
      * @returns Promise<boolean>
      *
      */
-    fileSend(fileName, fileType, fileContents, progressCallback) {
+    fileSend(fileName, fileType, fileContents, progressCallback = undefined) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this._connManager.isConnected()) {
+            if (!this._connManager.isConnected()) {
                 return false;
             }
             return yield this._ricFileHandler.fileSend(fileName, fileType, fileContents, progressCallback);
@@ -594,18 +725,20 @@ export class Marty {
                 RICUtils.warn('checkForUpdate failed to get latest from internet');
                 this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
             }
-            if (this._lastestVersionInfo === null)
-                return;
+            if (this._lastestVersionInfo === null) {
+                return false;
+            }
             // Get RIC version
-            if (!this._connManager.isConnected())
-                return;
+            if (!this._connManager.isConnected()) {
+                return false;
+            }
             try {
                 this._systemInfo = yield this.getRICSystemInfo();
                 RICUtils.debug(`checkForUpdate RIC Version ${this._systemInfo.SystemVersion}`);
             }
             catch (error) {
                 RICUtils.warn('checkForUpdate - failed to get version ' + error);
-                return;
+                return false;
             }
             // Check the version and incomplete previous hw-elem update if needed
             try {
@@ -615,15 +748,17 @@ export class Marty {
                     ' updateRequired ' + updateRequired.toString());
                 if (updateRequired) {
                     this._reportConnEvent(RICEvent.UPDATE_IS_AVAILABLE);
+                    return true;
                 }
                 else {
                     this._reportConnEvent(RICEvent.UPDATE_NOT_AVAILABLE);
+                    return false;
                 }
             }
             catch (error) {
                 RICUtils.warn('Failed to get latest version from internet');
                 this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
-                return;
+                return false;
             }
         });
     }
@@ -922,67 +1057,20 @@ export class Marty {
     _onConnStateChange(connEvent, connEventArgs) {
         return __awaiter(this, void 0, void 0, function* () {
             if (connEvent === RICEvent.DISCONNECTED_RIC) {
+                const ricName = this._ricFriendlyName ? this._ricFriendlyName : connEventArgs === null || connEventArgs === void 0 ? void 0 : connEventArgs.name;
                 this._systemInfo = null;
                 this._hwElems = new Array();
                 this._addOnManager.clear();
                 this._calibInfo = null;
                 this._ricFriendlyName = null;
                 this._ricFriendlyNameIsSet = false;
-                RICUtils.debug('Disconnected ' + (connEventArgs === null || connEventArgs === void 0 ? void 0 : connEventArgs.name));
+                RICUtils.debug(`Disconnected ${ricName}`);
                 this._reportConnEvent(connEvent, connEventArgs);
             }
             else if (connEvent === RICEvent.CONNECTED_RIC) {
                 this._reportConnEvent(RICEvent.CONNECTED_TRANSPORT_LAYER, connEventArgs);
-                // Get system info
-                try {
-                    this._systemInfo = yield this.getRICSystemInfo();
-                    RICUtils.debug(`eventConnect - RIC Version ${this._systemInfo.SystemVersion}`);
-                }
-                catch (error) {
-                    RICUtils.warn('eventConnect - failed to get version ' + error);
-                }
-                // Get RIC name
-                try {
-                    yield this.getRICName();
-                }
-                catch (error) {
-                    RICUtils.warn('eventConnect - failed to get RIC name ' + error);
-                }
-                // Get calibration info
-                try {
-                    this._calibInfo = yield this.getRICCalibInfo();
-                }
-                catch (error) {
-                    RICUtils.warn('eventConnect - failed to get calib info ' + error);
-                }
-                // Get HWElems (connected to RIC)
-                try {
-                    yield this.getHWElemList();
-                }
-                catch (error) {
-                    RICUtils.warn('eventConnect - failed to get HWElems ' + error);
-                }
-                // Subscribe for updates
-                try {
-                    yield this.subscribeForUpdates(true);
-                }
-                catch (error) {
-                    RICUtils.warn(`eventConnect - subscribe for updates failed ${error.toString()}`);
-                }
-                // RIC verified and connected
-                if (this._systemInfo) {
-                    if (connEventArgs) {
-                        connEventArgs.systemInfo = this._systemInfo;
-                    }
-                    else {
-                        connEventArgs = {
-                            systemInfo: this._systemInfo
-                        };
-                    }
-                }
-                this._reportConnEvent(connEvent, connEventArgs);
                 // Debug
-                RICUtils.debug('Connected ' + (connEventArgs === null || connEventArgs === void 0 ? void 0 : connEventArgs.name));
+                RICUtils.debug('ConnectedTransportLayer ' + (connEventArgs === null || connEventArgs === void 0 ? void 0 : connEventArgs.name));
             }
             else {
                 this._reportConnEvent(connEvent, connEventArgs);
