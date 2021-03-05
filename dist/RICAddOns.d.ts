@@ -35,7 +35,7 @@ export declare class RICAddOnLEDEye extends RICAddOnBase {
 }
 export declare class RICAddOnIRFoot extends RICAddOnBase {
     _dataExtractor: DataExtractor;
-    constructor(name: string, versionNumber: number);
+    constructor(name: string, deviceTypeID: number);
     processPublishedData(addOnID: number, statusByte: number, rawData: Uint8Array): ROSSerialAddOnStatus;
 }
 export declare class RICAddOnColourSensor extends RICAddOnBase {

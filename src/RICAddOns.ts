@@ -317,16 +317,9 @@ export class RICAddOnLEDEye extends RICAddOnBase {
 
 export class RICAddOnIRFoot extends RICAddOnBase {
   _dataExtractor: DataExtractor;
-  constructor(name: string, versionNumber: number) {
+  constructor(name: string, deviceTypeID: number) {
     super(name);
-    this._deviceTypeID = 0;
-    if (versionNumber == 1){
-      this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1);
-    } else if (versionNumber == 2){
-      this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2);
-    } else {
-      RICUtils.error("Incorrect IRFoot version number given: " + versionNumber);
-    }
+    this._deviceTypeID = deviceTypeID;
     this._dataExtractor = new DataExtractor(name, ADDON_IRFOOT_FORMAT_DEF);
   }
   processPublishedData(

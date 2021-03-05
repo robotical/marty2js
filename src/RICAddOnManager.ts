@@ -47,8 +47,9 @@ export default class RICAddOnManager {
     const addOnMap: Dictionary<RICAddOnBase> = {};
     // Iterate HWElems to find addons
     for (const hwElem of hwElems) {
+      const dtid = parseInt("0x" + hwElem.whoAmITypeCode);
       if (hwElem.type === 'RSAddOn') {
-        switch (parseInt("0x" + hwElem.whoAmITypeCode)) {
+        switch (dtid) {
           case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO):
             addOnMap[hwElem.IDNo.toString()] = new RICAddOnGripServo(
               hwElem.name
@@ -70,16 +71,11 @@ export default class RICAddOnManager {
             );
             break;
           case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1):
-            addOnMap[hwElem.IDNo.toString()] = new RICAddOnIRFoot(
-              hwElem.name,
-              1
-             );
-            break;
           case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2):
             addOnMap[hwElem.IDNo.toString()] = new RICAddOnIRFoot(
               hwElem.name,
-              2
-            );
+              dtid
+             );
             break;
           case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
             addOnMap[hwElem.IDNo.toString()] = new RICAddOnColourSensor(
