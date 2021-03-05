@@ -1,4 +1,4 @@
-import { getHWElemTypeStr, RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO, RICAddOnGrabServo, RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT, RICAddOnLEDFoot, RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM, RICAddOnLEDArm, RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE, RICAddOnLEDEye, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2, RICAddOnIRFoot, RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR, RICAddOnColourSensor, RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE, RICAddOnDistanceSensor, RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT, RICAddOnLightSensor, RIC_WHOAMI_TYPE_CODE_ADDON_NOISE, RICAddOnNoiseSensor, } from './RICAddOns.js';
+import { getHWElemTypeStr, RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO, RICAddOnGripServo, RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT, RICAddOnLEDFoot, RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM, RICAddOnLEDArm, RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE, RICAddOnLEDEye, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2, RICAddOnIRFoot, RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR, RICAddOnColourSensor, RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE, RICAddOnDistanceSensor, RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT, RICAddOnLightSensor, RIC_WHOAMI_TYPE_CODE_ADDON_NOISE, RICAddOnNoiseSensor, } from './RICAddOns.js';
 export default class RICAddOnManager {
     constructor() {
         this._addOnMap = {};
@@ -18,8 +18,8 @@ export default class RICAddOnManager {
         for (const hwElem of hwElems) {
             if (hwElem.type === 'RSAddOn') {
                 switch (parseInt("0x" + hwElem.whoAmITypeCode)) {
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
-                        addOnMap[hwElem.IDNo.toString()] = new RICAddOnGrabServo(hwElem.name);
+                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO):
+                        addOnMap[hwElem.IDNo.toString()] = new RICAddOnGripServo(hwElem.name);
                         break;
                     case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDFoot(hwElem.name);

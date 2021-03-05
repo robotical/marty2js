@@ -2,8 +2,8 @@ import { Dictionary, RICHWElem } from './RICTypes.js';
 import {
   getHWElemTypeStr,
   RICAddOnBase,
-  RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO,
-  RICAddOnGrabServo,
+  RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO,
+  RICAddOnGripServo,
   RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT,
   RICAddOnLEDFoot,
   RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM,
@@ -49,8 +49,8 @@ export default class RICAddOnManager {
     for (const hwElem of hwElems) {
       if (hwElem.type === 'RSAddOn') {
         switch (parseInt("0x" + hwElem.whoAmITypeCode)) {
-          case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
-            addOnMap[hwElem.IDNo.toString()] = new RICAddOnGrabServo(
+          case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO):
+            addOnMap[hwElem.IDNo.toString()] = new RICAddOnGripServo(
               hwElem.name
             );
             break;

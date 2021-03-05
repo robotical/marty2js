@@ -8,7 +8,7 @@ export declare const RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT = "00000087";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM = "00000088";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE = "00000089";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE = "0000008A";
-export declare const RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO = "0000008B";
+export declare const RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO = "0000008B";
 export declare const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2 = "0000008C";
 export declare function getHWElemTypeStr(whoAmITypeCode: string | undefined): string;
 export declare class RICAddOnBase {
@@ -17,7 +17,7 @@ export declare class RICAddOnBase {
     constructor(name: string);
     processPublishedData(addOnID: number, statusByte: number, rawData: Uint8Array): ROSSerialAddOnStatus;
 }
-export declare class RICAddOnGrabServo extends RICAddOnBase {
+export declare class RICAddOnGripServo extends RICAddOnBase {
     constructor(name: string);
     processPublishedData(addOnID: number, statusByte: number): ROSSerialAddOnStatus;
 }

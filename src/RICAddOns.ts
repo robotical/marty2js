@@ -11,7 +11,7 @@ export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT   = '00000087'; //135
 export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM    = '00000088'; //136
 export const RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE    = '00000089'; //137
 export const RIC_WHOAMI_TYPE_CODE_ADDON_NOISE     = '0000008A'; //138
-export const RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO = '0000008B'; //139
+export const RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO = '0000008B'; //139
 export const RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2 = '0000008C'; //140
 
 // Format definitions
@@ -176,7 +176,7 @@ export function getHWElemTypeStr(whoAmITypeCode: string | undefined) {
   }
   switch (parseInt(whoAmITypeCode)) {
 
-    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO):
+    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO):
       return 'GripperArm';
 
     case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
@@ -228,10 +228,10 @@ export class RICAddOnBase {
 }
 
 
-export class RICAddOnGrabServo extends RICAddOnBase {
+export class RICAddOnGripServo extends RICAddOnBase {
   constructor(name: string) {
     super(name);
-    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRABSERVO);
+    this._deviceTypeID = parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO);
   }
   
   processPublishedData(
