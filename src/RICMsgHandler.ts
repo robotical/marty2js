@@ -505,8 +505,10 @@ export default class RICMsgHandler {
                 this._msgTrackInfos[i].msgFrame!,
                 this._msgTrackInfos[i].withResponse,
               );
-            } catch (error) {
-              RICUtils.warn('Retry message failed' + error.toString());
+            } catch (error: unknown) {
+              if (error instanceof Error) {
+                RICUtils.warn('Retry message failed' + error.toString());
+              }
             }
           }
           this._commsStats.recordMsgRetry();
