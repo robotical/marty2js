@@ -212,14 +212,14 @@ export class Marty {
             RICUtils.debug(
                 `eventConnect - RIC Version ${this._systemInfo.SystemVersion}`,
             );
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('eventConnect - failed to get version ' + error);
         }
 
         // Get RIC name
         try {
             await this.getRICName();
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('eventConnect - failed to get RIC name ' + error);
         }
 
@@ -233,15 +233,17 @@ export class Marty {
         // Get HWElems (connected to RIC)
         try {
             await this.getHWElemList();
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('eventConnect - failed to get HWElems ' + error);
         }
 
         // Subscribe for updates
         try {
             await this.subscribeForUpdates(true);
-        } catch (error) {
-            RICUtils.warn(`eventConnect - subscribe for updates failed ${error.toString()}`)
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(`eventConnect - subscribe for updates failed ${error.toString()}`)
+            }
         }
 
         // RIC verified and connected
@@ -283,8 +285,10 @@ export class Marty {
                 'robot/' + arg,
                 true,
             );
-        } catch (error) {
-            RICUtils.warn('robotControl failed ' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('robotControl failed ' + error.toString());
+            }
             return new RICOKFail();
         }
     }
@@ -304,8 +308,10 @@ export class Marty {
                 'pwrctrl/' + arg,
                 true,
             );
-        } catch (error) {
-           RICUtils.warn('powerControl failed ' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('powerControl failed ' + error.toString());
+            }
             return new RICOKFail();
         }
     }
@@ -326,8 +332,10 @@ export class Marty {
                 'filerun/' + fileName,
                 true,
             );
-        } catch (error) {
-           RICUtils.warn('fileRun failed ' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('fileRun failed ' + error.toString());
+            }
             return new RICOKFail();
         }
     }
@@ -353,7 +361,7 @@ export class Marty {
             this._ricFriendlyNameIsSet = true;
             this._reportConnEvent(RICEvent.SET_RIC_NAME_SUCCESS, { newName: nameThatHasBeenSet });
             return nameThatHasBeenSet;
-        } catch (error) {
+        } catch (error: unknown) {
             this._reportConnEvent(RICEvent.SET_RIC_NAME_FAILED);
             return '';
         }
@@ -375,7 +383,7 @@ export class Marty {
                 this._ricFriendlyNameIsSet = msgRsltJsonObj.friendlyNameIsSet != 0;
             }
             return msgRsltJsonObj;
-        } catch (error) {
+        } catch (error: unknown) {
             return new RICNameResponse();
         }
     }
@@ -395,8 +403,10 @@ export class Marty {
             >('v', true);
            RICUtils.debug(`getRICSystemInfo returned ${JSON.stringify(ricSystemInfo)}`);
             return ricSystemInfo;
-        } catch (error) {
-           RICUtils.warn(`getRICSystemInfo Failed to get version ${error.toString()}`);
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(`getRICSystemInfo Failed to get version ${error.toString()}`);
+            }
             return new RICSystemInfo();
         }
     }
@@ -416,8 +426,10 @@ export class Marty {
             >('calibrate', true);
            RICUtils.debug(`getRICCalibInfo returned ${JSON.stringify(ricCalibInfo)}`);
             return ricCalibInfo;
-        } catch (error) {
-           RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
+            }
             return new RICCalibInfo();
         }
     }
@@ -450,8 +462,10 @@ export class Marty {
                 RICOKFail
             >(enable ? subscribeEnable : subscribeDisable, true);
            RICUtils.debug(`subscribe enable/disable returned ${JSON.stringify(ricResp)}`);
-        } catch (error) {
-           RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(`getRICCalibInfo Failed to get version ${error.toString()}`);
+            }
         }
     }
 
@@ -478,8 +492,10 @@ export class Marty {
             let cmdUrl = 'traj/' + trajName;
             if (paramQueryStr.length > 0) cmdUrl += '?' + paramQueryStr;
             return await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(cmdUrl, true);
-        } catch (error) {
-           RICUtils.warn('runTrajectory failed' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('runTrajectory failed' + error.toString());
+            }
             return new RICOKFail();
         }
     }
@@ -505,25 +521,25 @@ export class Marty {
                 if (msgContent.command === 'listFiles') {
                     try {
                         // TODO
-                    } catch (error) {
+                    } catch (error: unknown) {
                         return new RICOKFail();
                     }
                 } else if (msgContent.command === 'saveFile') {
                     try {
                         // TODO
-                    } catch (error) {
+                    } catch (error: unknown) {
                         return new RICOKFail();
                     }
                 } else if (msgContent.command === 'deleteFile') {
                     try {
                         // TODO
-                    } catch (error) {
+                    } catch (error: unknown) {
                         return new RICOKFail();
                     }
                 } else if (msgContent.command === 'loadFile') {
                     try {
                         // TODO
-                    } catch (error) {
+                    } catch (error: unknown) {
                         return new RICOKFail();
                     }
                 } else if (msgContent.command === 'playRawSound')
@@ -537,14 +553,18 @@ export class Marty {
                             this.fileRun("__tmpsnd.raw");
                         }
                         return new RICOKFail(fsResult);
-                    } catch(err) {
-                        console.log("Send failed", err);
+                    } catch(err: unknown) {
+                        if (err instanceof Error) {
+                            console.log("Send failed", err.toString());
+                        }
                     }
                     return new RICOKFail();
                 }
-            } catch (error) {
-                RICUtils.warn('runCommand failed to parse JSON ' + error.toString());
-                    return new RICOKFail();
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    RICUtils.warn('runCommand failed to parse JSON ' + error.toString());
+                }
+                return new RICOKFail();
             }    
         } else {
             try {
@@ -561,8 +581,10 @@ export class Marty {
                     restCmdOrJsonCmd,
                     true,
                 );
-            } catch (error) {
-            RICUtils.warn('runCommand failed' + error.toString());
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    RICUtils.warn('runCommand failed' + error.toString());
+                }
                 return new RICOKFail();
             }
         }
@@ -583,8 +605,10 @@ export class Marty {
                 'hwfwupd',
                 true,
             );
-        } catch (error) {
-           RICUtils.warn('hwElemFirmwareUpdate get status failed' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('hwElemFirmwareUpdate get status failed' + error.toString());
+            }
             return new RICOKFail();
         }
     }
@@ -617,8 +641,10 @@ export class Marty {
             this._hwElems = ricHWList.hw;
             this._addOnManager.setHWElems(this._hwElems);
             return ricHWList;
-        } catch (error) {
-            RICUtils.warn('getHWElemList Failed to get list of HWElems' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('getHWElemList Failed to get list of HWElems' + error.toString());
+            }
             return new RICHWElemList();
         }
     }
@@ -641,7 +667,7 @@ export class Marty {
                 true,
             );
             return msgRslt;
-        } catch (error) {
+        } catch (error: unknown) {
             return new RICOKFail();
         }
     }
@@ -662,8 +688,10 @@ export class Marty {
             );
             RICUtils.debug('getAddOnList returned ' + addOnList);
             return addOnList;
-        } catch (error) {
-            RICUtils.warn('getAddOnList Failed to get list of add-ons' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('getAddOnList Failed to get list of add-ons' + error.toString());
+            }
             return new RICAddOnList();
         }
     }
@@ -684,8 +712,10 @@ export class Marty {
             );
             RICUtils.debug('getFileList returned ' + ricFileList);
             return ricFileList;
-        } catch (error) {
-            RICUtils.warn('getFileList Failed to get file list' + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn('getFileList Failed to get file list' + error.toString());
+            }
             return new RICFileList();
         }
     }
@@ -754,8 +784,10 @@ export class Marty {
                         true,
                     );
                     if (rslt.rslt != 'ok') overallResult = false;
-                } catch (error) {
-                    RICUtils.warn(`calibrate failed on joint ${jnt}` + error.toString());
+                } catch (error: unknown) {
+                    if (error instanceof Error) {
+                        RICUtils.warn(`calibrate failed on joint ${jnt}` + error.toString());
+                    }
                 }
 
                 // Wait as writing to flash blocks servo access
@@ -773,8 +805,10 @@ export class Marty {
                         true,
                     );
                     if (rslt.rslt != 'ok') overallResult = false;
-                } catch (error) {
-                    RICUtils.warn(`enable failed on joint ${jnt}` + error.toString());
+                } catch (error: unknown) {
+                    if (error instanceof Error) {
+                        RICUtils.warn(`enable failed on joint ${jnt}` + error.toString());
+                    }
                 }
             }
 
@@ -818,7 +852,7 @@ export class Marty {
                 'https://updates.robotical.io/marty2/current_version.json',
             );
             this._lastestVersionInfo = response.data;
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('checkForUpdate failed to get latest from internet');
             this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
         }
@@ -835,7 +869,7 @@ export class Marty {
             RICUtils.debug(
                 `checkForUpdate RIC Version ${this._systemInfo.SystemVersion}`,
             );
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('checkForUpdate - failed to get version ' + error);
             return false;
         }
@@ -858,7 +892,7 @@ export class Marty {
                 this._reportConnEvent(RICEvent.UPDATE_NOT_AVAILABLE);
                 return false;
             }
-        } catch (error) {
+        } catch (error: unknown) {
             RICUtils.warn('Failed to get latest version from internet');
             this._reportConnEvent(RICEvent.UPDATE_CANT_REACH_SERVER);
             return false;
@@ -909,7 +943,7 @@ export class Marty {
                 if (this.TEST_PRETEND_ELEM_UPDATE_REQD) {
                     this._updateElemsRequired = true;
                 }
-            } catch (error) {
+            } catch (error: unknown) {
                 RICUtils.warn(
                     'isUpdateRequired failed to get hw-elem firmware update status',
                 );
@@ -1002,9 +1036,11 @@ export class Marty {
                     throw Error('file download res null');
                 }
             }
-        } catch (error) {
-            RICUtils.warn(error);
-            this._reportConnEvent(RICEvent.UPDATE_FAILED + error.toString());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(error.toString());
+                this._reportConnEvent(RICEvent.UPDATE_FAILED);
+            }
             return;
         }
 
@@ -1062,8 +1098,10 @@ export class Marty {
                 );
                 sentBytes += firmwareData[fwIdx].length;
             }
-        } catch (error) {
-            RICUtils.warn(error);
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                RICUtils.warn(error.toString());
+            }
             this._reportConnEvent(RICEvent.UPDATE_FAILED);
             return;
         }
@@ -1118,11 +1156,13 @@ export class Marty {
                         firmwareUpdateConfirmed = true;
                     }
                     break;
-                } catch (error) {
-                    RICUtils.warn(
-                        'fwUpdate - failed to get version attempt ' +
-                        fwUpdateCheckCount.toString() + 'error' + error.toString()
-                    );
+                } catch (error: unknown) {
+                    if (error instanceof Error) {
+                        RICUtils.warn(
+                            'fwUpdate - failed to get version attempt ' +
+                            fwUpdateCheckCount.toString() + 'error' + error.toString()
+                        );
+                    }
                 }
             }
 
@@ -1157,7 +1197,7 @@ export class Marty {
             const updateCmd = `hwfwupd/${elemFw.elemType}/${elemFw.destname}/all`;
             try {
                 await this._ricMsgHandler.sendRICRESTURL<RICOKFail>(updateCmd, true);
-            } catch (error) {
+            } catch (error: unknown) {
                 RICUtils.warn('failed to start hw-elem firmware update cmd ' + updateCmd);
 
                 // Continue with other firmwares
@@ -1195,7 +1235,7 @@ export class Marty {
                         allElemsUpdatedOk = elUpdRslt.st.i === 0;
                         break;
                     }
-                } catch (error) {
+                } catch (error: unknown) {
                     RICUtils.warn('failed to get hw-elem firmware update status');
                 }
             }

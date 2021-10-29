@@ -219,10 +219,12 @@ export default class RICMsgHandler {
                 `handleNewRxMsg RICREST doesn't contain rslt ${restStr}`,
               );
             }
-          } catch (excp) {
-            console.warn(
-              `handleNewRxMsg Failed to parse JSON response ${excp}`,
-            );
+          } catch (excp: unknown) {
+            if (excp instanceof Error) {
+              console.warn(
+                `handleNewRxMsg Failed to parse JSON response ${excp.toString()}`,
+              );
+            }
           }
         }
       } else {
@@ -373,7 +375,11 @@ export default class RICMsgHandler {
         reject(error);
       }
     });
-    promise.catch(error => RICUtils.warn(error));
+    promise.catch((error: unknown) => { 
+      if (error instanceof Error) { 
+        RICUtils.warn(error.toString());
+      }
+    });
     return promise;
   }
 

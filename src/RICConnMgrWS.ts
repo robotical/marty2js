@@ -182,8 +182,10 @@ export default class RICConnMgrWS {
 
                 // Resolve the promise - success
                 resolve(true);
-            }).catch((err) => {
-                RICUtils.verbose(`WS open failed ${err}`)
+            }).catch((err: unknown) => {
+                if (err instanceof Error) {
+                    RICUtils.verbose(`WS open failed ${err.toString()}`)
+                }
                 // Resolve - failed
                 reject(false);
             })
@@ -212,9 +214,11 @@ export default class RICConnMgrWS {
                     RICUtils.warn(`Websocket error: ${evt.message}`);
                     reject(evt);
                 }
-            } catch (error) {
-                RICUtils.warn('Websocket open failed: ' + error.toString());
-                reject(error);
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    RICUtils.warn('Websocket open failed: ' + error.toString());
+                    reject(error);
+                }
             }
         });
     }
