@@ -388,8 +388,10 @@ export default class RICFileHandler {
         if (promRslt !== null)
           this._msgAwaitList.push(new FileBlockTrackInfo(promRslt));
       }
-    } catch (error) {
-      RICUtils.warn(`_sendFileBlock error${error.toString()}`);
+    } catch (catch (error: unknown) {
+      if (error instanceof Error) {
+        RICUtils.warn(`_sendFileBlock error${error.toString()}`);
+      }
     }
     return blockLen;
   }
@@ -407,8 +409,10 @@ export default class RICFileHandler {
       for (const promRslt of this._msgAwaitList) {
         try {
           await promRslt.get();
-        } catch (error) {
-          RICUtils.warn(`awaitAll file part send failed ${error.toString()}`);
+        } catch (catch (error: unknown) {
+          if (error instanceof Error) {
+            RICUtils.warn(`awaitAll file part send failed ${error.toString()}`);
+          }
         }
       }
       this._msgAwaitList = [];
@@ -421,8 +425,10 @@ export default class RICFileHandler {
         const fileBlockTrackInfo = this._msgAwaitList.shift();
         try {
           await fileBlockTrackInfo!.get();
-        } catch (error) {
-          RICUtils.warn(`awaitSome file part send failed ${error.toString()}`);
+        } catch (catch (error: unknown) {
+          if (error instanceof Error) {
+            RICUtils.warn(`awaitSome file part send failed ${error.toString()}`);
+          }
         }
       }
     }
