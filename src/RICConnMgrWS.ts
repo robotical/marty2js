@@ -204,7 +204,7 @@ export default class RICConnMgrWS {
 
                 // Open socket
                 webSocket.binaryType = "arraybuffer";
-                webSocket.onopen = (_evt: WebSocket.OpenEvent) => {
+                webSocket.onopen = (_evt: WebSocket.Event) => {
                     RICUtils.debug('WebSocket connection opened');
                     // // We're connected
                     this._webSocketIsConnected = true;
