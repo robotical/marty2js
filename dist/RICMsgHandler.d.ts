@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import CommsStats from './CommsStats.js';
 import MsgTrackInfo from './RICMsgTrackInfo.js';
 import { ROSSerialIMU, ROSSerialSmartServos, ROSSerialPowerStatus, ROSSerialAddOnStatusList } from './RICROSSerial.js';

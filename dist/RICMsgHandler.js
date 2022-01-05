@@ -155,7 +155,9 @@ export default class RICMsgHandler {
                         }
                     }
                     catch (excp) {
-                        console.warn(`handleNewRxMsg Failed to parse JSON response ${excp}`);
+                        if (excp instanceof Error) {
+                            console.warn(`handleNewRxMsg Failed to parse JSON response ${excp.toString()}`);
+                        }
                     }
                 }
             }
@@ -248,7 +250,11 @@ export default class RICMsgHandler {
                     reject(error);
                 }
             }));
-            promise.catch(error => RICUtils.warn(error));
+            promise.catch((error) => {
+                if (error instanceof Error) {
+                    RICUtils.warn(error.toString());
+                }
+            });
             return promise;
         });
     }
@@ -339,7 +345,9 @@ export default class RICMsgHandler {
                                 yield this._msgSender.sendTxMsg(this._msgTrackInfos[i].msgFrame, this._msgTrackInfos[i].withResponse);
                             }
                             catch (error) {
-                                RICUtils.warn('Retry message failed' + error.toString());
+                                if (error instanceof Error) {
+                                    RICUtils.warn('Retry message failed' + error.toString());
+                                }
                             }
                         }
                         this._commsStats.recordMsgRetry();
