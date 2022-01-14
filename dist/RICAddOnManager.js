@@ -1,4 +1,4 @@
-import { getHWElemTypeStr, RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO, RICAddOnGripServo, RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT, RICAddOnLEDFoot, RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM, RICAddOnLEDArm, RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE, RICAddOnLEDEye, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2, RICAddOnIRFoot, RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR, RICAddOnColourSensor, RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE, RICAddOnDistanceSensor, RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT, RICAddOnLightSensor, RIC_WHOAMI_TYPE_CODE_ADDON_NOISE, RICAddOnNoiseSensor, } from './RICAddOns.js';
+import { getHWElemTypeStr, RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO, RICAddOnGripServo, RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT, RICAddOnLEDFoot, RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM, RICAddOnLEDArm, RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE, RICAddOnLEDEye, RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT, RICAddOnIRFoot, RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR, RICAddOnColourSensor, RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE, RICAddOnDistanceSensor, RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT, RICAddOnLightSensor, RIC_WHOAMI_TYPE_CODE_ADDON_NOISE, RICAddOnNoiseSensor, } from './RICAddOns.js';
 export default class RICAddOnManager {
     constructor() {
         this._addOnMap = {};
@@ -9,42 +9,41 @@ export default class RICAddOnManager {
     clear() {
         this._addOnMap = {};
     }
-    convertHWElemType(whoAmITypeCode, whoAmI) {
-        return getHWElemTypeStr(whoAmITypeCode, whoAmI);
+    convertHWElemType(whoAmI) {
+        return getHWElemTypeStr(whoAmI);
     }
     getMappingOfAddOns(hwElems) {
         const addOnMap = {};
         // Iterate HWElems to find addons
         for (const hwElem of hwElems) {
-            const dtid = parseInt("0x" + hwElem.whoAmITypeCode);
+            console.log(hwElem.whoAmI, 'RICAddOnManager.ts', 'line: ', '50');
             if (hwElem.type === 'RSAddOn') {
-                switch (dtid) {
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO):
+                switch (hwElem.whoAmI) {
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_GRIPSERVO:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnGripServo(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_LEDFOOT:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDFoot(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_LEDARM:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDArm(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_LEDEYE:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnLEDEye(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V1):
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT_V2):
-                        addOnMap[hwElem.IDNo.toString()] = new RICAddOnIRFoot(hwElem.name, dtid);
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_IRFOOT:
+                        addOnMap[hwElem.IDNo.toString()] = new RICAddOnIRFoot(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_COLOUR:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnColourSensor(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_DISTANCE:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnDistanceSensor(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_LIGHT:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnLightSensor(hwElem.name);
                         break;
-                    case parseInt("0x" + RIC_WHOAMI_TYPE_CODE_ADDON_NOISE):
+                    case RIC_WHOAMI_TYPE_CODE_ADDON_NOISE:
                         addOnMap[hwElem.IDNo.toString()] = new RICAddOnNoiseSensor(hwElem.name);
                         break;
                 }

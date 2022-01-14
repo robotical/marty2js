@@ -50,6 +50,7 @@ export class Marty {
         this._calibInfo = null;
         // HWElems (connected to RIC)
         this._hwElems = new Array();
+        this._hwElems2 = new Array();
         // Add-on Manager
         this._addOnManager = new RICAddOnManager();
         // Listener for state changes
@@ -103,6 +104,7 @@ export class Marty {
         this._ricMsgHandler.registerForResults(this);
         this._ricMsgHandler.registerMsgSender(this._connManager);
         this._ricFileHandler.registerMsgSender(this._connManager);
+        console.log("initialising marty", 'Marty.ts', 'line: ', '158');
     }
     // Callback for RIC events including data
     setEventListener(listener) {
@@ -528,8 +530,8 @@ export class Marty {
         });
     }
     //get the name of the addons type from the type code
-    convertHWElemType(whoAmITypeCode, whoAmI) {
-        return this._addOnManager.convertHWElemType(whoAmITypeCode, whoAmI);
+    convertHWElemType(whoAmI) {
+        return this._addOnManager.convertHWElemType(whoAmI);
     }
     // Mark: Get HWElem list -----------------------------------------------------------
     /**

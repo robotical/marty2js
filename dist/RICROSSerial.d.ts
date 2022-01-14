@@ -30,7 +30,7 @@ export declare class ROSSerialPowerStatus {
 }
 export declare class ROSSerialAddOnStatus {
     id: number;
-    deviceTypeID: number;
+    whoAmI: string;
     name: string;
     status: number;
     vals: {};
