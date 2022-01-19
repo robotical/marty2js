@@ -15,6 +15,7 @@ export declare class Marty {
     _ricFriendlyNameIsSet: boolean;
     _calibInfo: RICCalibInfo | null;
     _hwElems: Array<RICHWElem>;
+    _hwElems2: Array<RICHWElem>;
     _addOnManager: RICAddOnManager;
     _discoveryListener: RICDiscoveryListener | null;
     _progressAfterDownload: number;
@@ -155,7 +156,7 @@ export declare class Marty {
      *
      */
     hwElemFirmwareUpdate(): Promise<RICOKFail>;
-    convertHWElemType(whoAmITypeCode: string | undefined, whoAmI: string | undefined): string;
+    convertHWElemType(whoAmI: string | undefined): string;
     /**
      *
      * getHWElemList - get list of HWElems on the robot (including add-ons)

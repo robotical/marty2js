@@ -36,7 +36,7 @@ export class ROSSerialPowerStatus {
 export class ROSSerialAddOnStatus {
     constructor() {
         this.id = 0;
-        this.deviceTypeID = 0;
+        this.whoAmI = '';
         this.name = '';
         this.status = 0;
         this.vals = {};

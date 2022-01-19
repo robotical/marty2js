@@ -133,7 +133,7 @@ export default class RICConnMgrWS {
             // Connect to websocket
             // try {
             //     this._webSocket = await this.webSocketOpen(wsURL);
-            // } catch (error) {
+            // } catch (error: any) {
             //     RICUtils.debug(`Unable to create WebSocket ${error.toString()}`);
             //     return false;
             // }

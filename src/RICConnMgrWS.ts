@@ -145,7 +145,7 @@ export default class RICConnMgrWS {
         // Connect to websocket
         // try {
         //     this._webSocket = await this.webSocketOpen(wsURL);
-        // } catch (error) {
+        // } catch (error: any) {
         //     RICUtils.debug(`Unable to create WebSocket ${error.toString()}`);
         //     return false;
         // }
@@ -214,11 +214,9 @@ export default class RICConnMgrWS {
                     RICUtils.warn(`Websocket error: ${evt.message}`);
                     reject(evt);
                 }
-            } catch (error: unknown) {
-                if (error instanceof Error) {
-                    RICUtils.warn('Websocket open failed: ' + error.toString());
-                    reject(error);
-                }
+            } catch (error: any) {
+                RICUtils.warn('Websocket open failed: ' + error.toString());
+                reject(error);
             }
         });
     }
