@@ -286,7 +286,9 @@ export default class RICFileHandler {
                 }
             }
             catch (error) {
-                RICUtils.warn(`_sendFileBlock error${error.toString()}`);
+                if (error instanceof Error) {
+                    RICUtils.warn(`_sendFileBlock error${error.toString()}`);
+                }
             }
             return blockLen;
         });
@@ -306,7 +308,9 @@ export default class RICFileHandler {
                         yield promRslt.get();
                     }
                     catch (error) {
-                        RICUtils.warn(`awaitAll file part send failed ${error.toString()}`);
+                        if (error instanceof Error) {
+                            RICUtils.warn(`awaitAll file part send failed ${error.toString()}`);
+                        }
                     }
                 }
                 this._msgAwaitList = [];
@@ -320,7 +324,9 @@ export default class RICFileHandler {
                         yield fileBlockTrackInfo.get();
                     }
                     catch (error) {
-                        RICUtils.warn(`awaitSome file part send failed ${error.toString()}`);
+                        if (error instanceof Error) {
+                            RICUtils.warn(`awaitSome file part send failed ${error.toString()}`);
+                        }
                     }
                 }
             }

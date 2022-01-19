@@ -182,8 +182,10 @@ export default class RICConnMgrWS {
 
                 // Resolve the promise - success
                 resolve(true);
-            }).catch((err) => {
-                RICUtils.verbose(`WS open failed ${err}`)
+            }).catch((err: unknown) => {
+                if (err instanceof Error) {
+                    RICUtils.verbose(`WS open failed ${err.toString()}`)
+                }
                 // Resolve - failed
                 reject(false);
             })
@@ -202,7 +204,7 @@ export default class RICConnMgrWS {
 
                 // Open socket
                 webSocket.binaryType = "arraybuffer";
-                webSocket.onopen = (_evt: WebSocket.OpenEvent) => {
+                webSocket.onopen = (_evt: WebSocket.Event) => {
                     RICUtils.debug('WebSocket connection opened');
                     // // We're connected
                     this._webSocketIsConnected = true;

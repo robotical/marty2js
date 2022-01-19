@@ -215,6 +215,7 @@ export class Marty {
                 `eventConnect - RIC Version ${this._systemInfo.SystemVersion}`,
             );
         } catch (error: any) {
+
             RICUtils.warn('eventConnect - failed to get version ' + error);
         }
 
@@ -222,6 +223,7 @@ export class Marty {
         try {
             await this.getRICName();
         } catch (error: any) {
+
             RICUtils.warn('eventConnect - failed to get RIC name ' + error);
         }
 
@@ -235,7 +237,9 @@ export class Marty {
         // Get HWElems (connected to RIC)
         try {
             await this.getHWElemList();
+          
         } catch (error: any) {
+
             RICUtils.warn('eventConnect - failed to get HWElems ' + error);
         }
 
@@ -356,6 +360,7 @@ export class Marty {
             this._reportConnEvent(RICEvent.SET_RIC_NAME_SUCCESS, { newName: nameThatHasBeenSet });
             return nameThatHasBeenSet;
         } catch (error: any) {
+
             this._reportConnEvent(RICEvent.SET_RIC_NAME_FAILED);
             return '';
         }
@@ -378,6 +383,7 @@ export class Marty {
             }
             return msgRsltJsonObj;
         } catch (error: any) {
+
             return new RICNameResponse();
         }
     }
@@ -539,8 +545,10 @@ export class Marty {
                             this.fileRun("__tmpsnd.raw");
                         }
                         return new RICOKFail(fsResult);
-                    } catch(err) {
-                        console.log("Send failed", err);
+                    } catch(err: unknown) {
+                        if (err instanceof Error) {
+                            console.log("Send failed", err.toString());
+                        }
                     }
                     return new RICOKFail();
                 }
@@ -587,6 +595,7 @@ export class Marty {
             );
         } catch (error: any) {
            RICUtils.warn('hwElemFirmwareUpdate get status failed' + error.toString());
+
             return new RICOKFail();
         }
     }
@@ -644,6 +653,7 @@ export class Marty {
             );
             return msgRslt;
         } catch (error: any) {
+
             return new RICOKFail();
         }
     }
@@ -1007,6 +1017,7 @@ export class Marty {
         } catch (error: any) {
             RICUtils.warn(error);
             this._reportConnEvent(RICEvent.UPDATE_FAILED + error.toString());
+
             return;
         }
 
