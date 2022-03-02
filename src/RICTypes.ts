@@ -10,20 +10,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 import {
-    ROSSerialSmartServos,
-    ROSSerialIMU,
-    ROSSerialPowerStatus,
-    ROSSerialAddOnStatusList,
-} from './RICROSSerial.js';
+  ROSSerialSmartServos,
+  ROSSerialIMU,
+  ROSSerialPowerStatus,
+  ROSSerialAddOnStatusList,
+  ROSSerialRobotStatus,
+} from './RICROSSerial';
 
 export enum RICIFType {
-    RIC_INTERFACE_BLE,
-    RIC_INTERFACE_WIFI,
+  RIC_INTERFACE_BLE,
+  RIC_INTERFACE_WIFI,
 }
 
 export enum RICFileSendType {
-    RIC_NORMAL_FILE,
-    RIC_FIRMWARE_UPDATE,
+  RIC_NORMAL_FILE,
+  RIC_FIRMWARE_UPDATE,
 }
 
 export class DiscoveredRIC {
@@ -81,7 +82,7 @@ export enum RICDiscoveryState {
 }
 
 export interface RICSubscription {
-    remove(): void;
+  remove(): void;
 }
 
 export type RICDiscoveryListener = (
@@ -92,25 +93,26 @@ export type RICDiscoveryListener = (
 export type DiscoveredRICsCB = (discoveredRICs: DiscoveredRIC[]) => void;
 
 export type RICFriendlyName = {
-    friendlyName: string;
+  friendlyName: string;
 };
 
 export class RICNameResponse {
-    friendlyName = '';
-    friendlyNameIsSet = 0;
-    req = '';
-    rslt = 'commsFail';
+  friendlyName = '';
+  friendlyNameIsSet = 0;
+  req = '';
+  rslt = 'commsFail';
 }
 
 export class RICSystemInfo {
-    rslt = '';
-    SystemName = 'Unknown';
-    SystemVersion = '0.0.0';
+  rslt = '';
+  SystemName = 'Unknown';
+  SystemVersion = '0.0.0';
+  RicHwRevNo = 0;
 }
 
 export class RICCalibInfo {
-    rslt = '';
-    calDone = 0;
+  rslt = '';
+  calDone = 0;
 }
 
 export class RICOKFail {
@@ -128,150 +130,157 @@ export class RICOKFail {
 }
 
 export class RICHWFWStat {
-    s = '';
-    m = '';
-    v = '';
-    n = '';
-    p = 0;
-    i = 0;
-    c = [];
+  s = '';
+  m = '';
+  v = '';
+  n = '';
+  p = 0;
+  i = 0;
+  c = [];
 }
 
 export class RICHWFWUpdRslt {
-    req = '';
-    rslt = 'commsFail';
-    st: RICHWFWStat = new RICHWFWStat();
+  req = '';
+  rslt = 'commsFail';
+  st: RICHWFWStat = new RICHWFWStat();
 }
 
 export type RICFWInfo = {
-    elemType: string;
-    version: string;
-    firmware: string;
-    destname: string;
-    md5: string;
-    releaseNotes: string;
-    comments: string;
+  elemType: string;
+  version: string;
+  destname: string;
+  md5: string;
+  releaseNotes: string;
+  comments: string;
+  updaters: Array<string>;
+  downloadUrl: string;
+  firmware?: string;
 };
 
 export type RICUpdateInfo = {
-    rslt: string;
-    main: RICFWInfo;
-    addons: Array<RICFWInfo>;
+  rslt: string;
+  firmwareVersion: string;
+  ricRevision: string;
+  files: Array<RICFWInfo>;
+  minimumUpdaterVersion: Dictionary<string>;
+  note: string;
 };
 
 export type RICFileStartResp = {
-    batchMsgSize: number;
-    batchAckSize: number;
+  batchMsgSize: number;
+  batchAckSize: number;
 };
 
 export type RICWifi = {
-    isConn: 1 | 0;
-    connState: string;
-    SSID: string;
-    IP: string;
-    Hostname: string;
+  isConn: 1 | 0;
+  connState: string;
+  SSID: string;
+  IP: string;
+  Hostname: string;
 };
 
 export class RICStateInfo {
-    smartServos: ROSSerialSmartServos = new ROSSerialSmartServos();
-    smartServosValidMs = 0;
-    imuData: ROSSerialIMU = new ROSSerialIMU();
-    imuDataValidMs = 0;
-    power: ROSSerialPowerStatus = new ROSSerialPowerStatus();
-    powerValidMs = 0;
-    addOnInfo: ROSSerialAddOnStatusList = new ROSSerialAddOnStatusList();
-    addOnInfoValidMs = 0;
+  smartServos: ROSSerialSmartServos = new ROSSerialSmartServos();
+  smartServosValidMs = 0;
+  imuData: ROSSerialIMU = new ROSSerialIMU();
+  imuDataValidMs = 0;
+  power: ROSSerialPowerStatus = new ROSSerialPowerStatus();
+  powerValidMs = 0;
+  addOnInfo: ROSSerialAddOnStatusList = new ROSSerialAddOnStatusList();
+  addOnInfoValidMs = 0;
+  robotStatus: ROSSerialRobotStatus = new ROSSerialRobotStatus();
+  robotStatusValidMs = 0;
 }
 
 export type RICFile = {
-    name: string;
-    size: number;
+  name: string;
+  size: number;
 };
 
 export class RICFileList {
-    req = '';
-    rslt = 'ok';
-    fsName = 'spiffs';
-    fsBase = '/spiffs';
-    diskSize = 0;
-    diskUsed = 0;
-    folder = '/spiffs/';
-    files: Array<RICFile> = [];
+  req = '';
+  rslt = 'ok';
+  fsName = 'spiffs';
+  fsBase = '/spiffs';
+  diskSize = 0;
+  diskUsed = 0;
+  folder = '/spiffs/';
+  files: Array<RICFile> = [];
 }
 
 export type RICHWElem = {
-    name: string;
-    type: string;
-    busName: string;
-    addr: string;
-    addrValid: number;
-    IDNo: string;
-    whoAmI: string;
-    whoAmITypeCode: string;
-    SN: string;
-    versionStr: string;
-    commsOk: number;
+  name: string;
+  type: string;
+  busName: string;
+  addr: string;
+  addrValid: number;
+  IDNo: string;
+  whoAmI: string;
+  whoAmITypeCode: string;
+  SN: string;
+  versionStr: string;
+  commsOk: number;
 };
 
 export class RICHWElemList {
-    req = '';
-    rslt = 'ok';
-    hw: Array<RICHWElem> = [];
+  req = '';
+  rslt = 'ok';
+  hw: Array<RICHWElem> = [];
 }
 
 export type RICAddOn = {
-    name: string;
-    SN: string;
-    poll: string;
-    pollRd: number;
-    pollHz: number;
+  name: string;
+  SN: string;
+  poll: string;
+  pollRd: number;
+  pollHz: number;
 };
 
 export class RICAddOnList {
-    req = '';
-    rslt = 'ok';
-    addons: Array<RICAddOn> = [];
+  req = '';
+  rslt = 'ok';
+  addons: Array<RICAddOn> = [];
 }
 
 export class AddOnElemAndConfig {
-    constructor(
-        addOnConfig: RICAddOn | null,
-        hwElemRec: RICHWElem | null,
-        elemIdx: number,
-    ) {
-        this.isConfigured = addOnConfig !== null;
-        this.isConnected = hwElemRec !== null;
-        if (addOnConfig != null) {
-            this.SN = addOnConfig.SN;
-            this.name = addOnConfig.name;
-        } else if (hwElemRec != null) {
-            this.SN = hwElemRec.SN;
-            this.name = hwElemRec.name;
-        }
-        this.addOnConfig = addOnConfig;
-        this.hwElemRec = hwElemRec;
-        this.id = elemIdx.toString();
+  constructor(
+    addOnConfig: RICAddOn | null,
+    hwElemRec: RICHWElem | null,
+    elemIdx: number,
+  ) {
+    this.isConfigured = addOnConfig !== null;
+    this.isConnected = hwElemRec !== null;
+    if (addOnConfig != null) {
+      this.SN = addOnConfig.SN;
+      this.name = addOnConfig.name;
+    } else if (hwElemRec != null) {
+      this.SN = hwElemRec.SN;
+      this.name = hwElemRec.name;
     }
+    this.addOnConfig = addOnConfig;
+    this.hwElemRec = hwElemRec;
+    this.id = elemIdx.toString();
+  }
 
-    // Fields from config (stored in RIC NVS using addon REST API)
-    addOnConfig: RICAddOn | null = null;
-    // Fields from HWElem (from hwstatus command)
-    hwElemRec: RICHWElem | null = null;
-    // Fields allocated when combining records
-    name = '';
-    SN = '';
-    id = '0';
-    isConnected = false;
-    isConfigured = false;
+  // Fields from config (stored in RIC NVS using addon REST API)
+  addOnConfig: RICAddOn | null = null;
+  // Fields from HWElem (from hwstatus command)
+  hwElemRec: RICHWElem | null = null;
+  // Fields allocated when combining records
+  name = '';
+  SN = '';
+  id = '0';
+  isConnected = false;
+  isConfigured = false;
 }
 
 export interface Dictionary<T> {
-    [key: string]: T;
+  [key: string]: T;
 }
 
 export type RICConnEventArgs = {
-    ipAddress?: string;
-    name?: string;
+  ipAddress?: string;
+  name?: string;
     ifType?: RICIFType;
     systemInfo?: RICSystemInfo;
     newName?: string;

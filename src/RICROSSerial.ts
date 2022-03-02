@@ -9,10 +9,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import RICUtils from './RICUtils.js';
-import { MessageResult } from './RICMsgHandler.js';
-import CommsStats from './CommsStats.js';
-import RICAddOnManager from './RICAddOnManager.js';
+import RICLog from "./RICLog"
+import RICUtils from './RICUtils';
+import { MessageResult } from './RICMsgHandler';
+import CommsStats from './CommsStats';
+import RICAddOnManager from './RICAddOnManager';
 
 export class ROSSerialSmartServos {
   smartServos: {
@@ -55,7 +56,7 @@ export class ROSSerialPowerStatus {
 
 export class ROSSerialAddOnStatus {
   id = 0;
-  whoAmI = '';
+  deviceTypeID = 0;
   name = '';
   status = 0;
   vals = {};
@@ -65,11 +66,54 @@ export class ROSSerialAddOnStatusList {
   addons: Array<ROSSerialAddOnStatus> = new Array<ROSSerialAddOnStatus>();
 }
 
+export class ROSSerialRGBT {
+  r: number = 0;
+  g: number = 0;
+  b: number = 0;
+  t: number = 0;
+  constructor(r: number, g: number, b: number, t: number) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
+    this.t = t;
+  }
+  toString() {
+    return `R:${this.r} G:${this.g} B:${this.b} T:${this.t}`;
+  }
+}
+
+export class ROSSerialRobotStatus {
+robotStatus: {
+  flags: number,
+  isMoving: boolean,
+  isPaused: boolean,
+  isFwUpdating: boolean,
+  workQCount: number,
+  heapFree: number,
+  heapMin: number,
+  pixRGBT: ROSSerialRGBT[],
+  loopMsAvg: number,
+  loopMsMax: number,
+} = {
+    flags: 0,
+    isMoving: false,
+    isPaused: false,
+    isFwUpdating: false,
+    workQCount: 0,
+    heapFree: 0,
+    heapMin: 0,
+    pixRGBT: [],
+    loopMsAvg: 0,
+    loopMsMax: 0,
+  };
+}
+
 export type ROSSerialMsg =
   | ROSSerialSmartServos
   | ROSSerialIMU
   | ROSSerialPowerStatus
-  | ROSSerialAddOnStatusList;
+  | ROSSerialAddOnStatusList
+  | ROSSerialRobotStatus;
 
 export default class RICROSSerial {
   static decode(
@@ -89,6 +133,7 @@ export default class RICROSSerial {
       const ROSTOPIC_V2_ACCEL = 121;
       const ROSTOPIC_V2_POWER_STATUS = 122;
       const ROSTOPIC_V2_ADDONS = 123;
+      const ROSTOPIC_V2_ROBOT_STATUS = 124;
 
       // ROSSerial message format
       const RS_MSG_MIN_LENGTH = 8;
@@ -101,7 +146,7 @@ export default class RICROSSerial {
       // Max payload length
       const MAX_VALID_PAYLOAD_LEN = 1000;
 
-      // RICUtils.debug('ROSSerial Decode ' + remainingMsgLen);
+      // RICLog.debug('ROSSerial Decode ' + remainingMsgLen);
 
       if (remainingMsgLen < RS_MSG_MIN_LENGTH) break;
 
@@ -113,7 +158,7 @@ export default class RICROSSerial {
         rosSerialMsg[msgPos + RS_MSG_TOPIC_ID_LOW_POS] +
         rosSerialMsg[msgPos + RS_MSG_TOPIC_ID_HIGH_POS] * 256;
 
-      // RICUtils.debug('ROSSerial ' + payloadLength + ' topic ' + topicID);
+      // RICLog.debug('ROSSerial ' + payloadLength + ' topic ' + topicID);
 
       // Check max length
       if (payloadLength < 0 || payloadLength > MAX_VALID_PAYLOAD_LEN) break;
@@ -127,46 +172,48 @@ export default class RICROSSerial {
         msgPos + RS_MSG_PAYLOAD_POS + payloadLength,
       );
 
-      // RICUtils.debug('ROSSerial ' + RICUtils.bufferToHex(payload));
+      // RICLog.debug('ROSSerial ' + RICUtils.bufferToHex(payload));
 
-      // Extract SmartServos message
-      if (topicID === ROSTOPIC_V2_SMART_SERVOS) {
-        if (messageResult !== null) {
-          messageResult.onRxSmartServo(this.extractSmartServos(payload));
-          commsStats.recordSmartServos();
-        }
-      }
-
-      // Extract Accelerometer message
-      else if (topicID === ROSTOPIC_V2_ACCEL) {
-        if (messageResult !== null) {
-          messageResult.onRxIMU(this.extractAccel(payload));
-          commsStats.recordIMU();
-        }
-      }
-
-      // Extract Power status message
-      else if (topicID === ROSTOPIC_V2_POWER_STATUS) {
-        if (messageResult !== null) {
-          messageResult.onRxPowerStatus(this.extractPowerStatus(payload));
-          commsStats.recordPowerStatus();
-        }
-      }
-
-      // Extract add-on message
-      else if (topicID === ROSTOPIC_V2_ADDONS) {
-        if (messageResult !== null) {
-          messageResult.onRxAddOnPub(
-            this.extractAddOnStatus(payload, addOnManager),
-          );
-          commsStats.recordAddOnPub();
+      // Handle ROSSerial messages
+      if (messageResult !== null) {
+        switch(topicID) {
+          case ROSTOPIC_V2_SMART_SERVOS:
+            // Smart Servos
+            messageResult.onRxSmartServo(this.extractSmartServos(payload));
+            commsStats.recordSmartServos();
+            break;
+        case ROSTOPIC_V2_ACCEL:
+            // Accelerometer
+            messageResult.onRxIMU(this.extractAccel(payload));
+            commsStats.recordIMU();
+            break;
+        case ROSTOPIC_V2_POWER_STATUS:
+            // Power Status
+            messageResult.onRxPowerStatus(this.extractPowerStatus(payload));
+            commsStats.recordPowerStatus();
+            break;
+        case ROSTOPIC_V2_ADDONS:
+            // Addons
+            messageResult.onRxAddOnPub(this.extractAddOnStatus(payload, addOnManager));
+            commsStats.recordAddOnPub();
+            break;
+        case ROSTOPIC_V2_ROBOT_STATUS:
+            // Robot Status
+            messageResult.onRobotStatus(this.extractRobotStatus(payload));
+            commsStats.recordRobotStatus();
+            break;
+        default:
+            // Unknown topic
+            messageResult.onRxOtherROSSerialMsg(topicID, payload);
+            commsStats.recordOtherTopic();
+            break;
         }
       }
 
       // Move msgPos on
       msgPos += RS_MSG_PAYLOAD_POS + payloadLength + 1;
 
-      // RICUtils.debug('MsgPos ' + msgPos);
+      // RICLog.debug('MsgPos ' + msgPos);
     }
   }
 
@@ -204,7 +251,7 @@ export default class RICROSSerial {
 
   static extractPowerStatus(buf: Uint8Array): ROSSerialPowerStatus {
     // Power indicator values
-    // RICUtils.debug(`PowerStatus ${RICUtils.bufferToHex(buf)}`);
+    // RICLog.debug(`PowerStatus ${RICUtils.bufferToHex(buf)}`);
     const remCapPC = RICUtils.getBEUint8FromBuf(buf, 0);
     const tempDegC = RICUtils.getBEUint8FromBuf(buf, 1);
     const remCapMAH = RICUtils.getBEUint16FromBuf(buf, 2);
@@ -232,7 +279,7 @@ export default class RICROSSerial {
     buf: Uint8Array,
     addOnManager: RICAddOnManager,
   ): ROSSerialAddOnStatusList {
-    // RICUtils.debug(`AddOnRawData ${RICUtils.bufferToHex(buf)}`);
+    // RICLog.debug(`AddOnRawData ${RICUtils.bufferToHex(buf)}`);
     // Each group of attributes for a add-on is a fixed size
     const ROS_ADDON_ATTR_GROUP_BYTES = 12;
     const numGroups = Math.floor(buf.length / ROS_ADDON_ATTR_GROUP_BYTES);
@@ -253,5 +300,56 @@ export default class RICROSSerial {
       }
     }
     return msg;
+  }
+
+  static extractRGBT(buf: Uint8Array, offset: number): ROSSerialRGBT {
+    return new ROSSerialRGBT(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
+  }
+
+  static extractRobotStatus(buf: Uint8Array): ROSSerialRobotStatus {
+    if (buf.length >= 24) {
+        const flags = RICUtils.getBEUint8FromBuf(buf, 0);
+        const workQCount = RICUtils.getBEUint8FromBuf(buf, 1);
+        const heapFree = RICUtils.getBEUint32FromBuf(buf, 2);
+        const heapMin = RICUtils.getBEUint32FromBuf(buf, 6);
+        const pixRGBT1 = RICROSSerial.extractRGBT(buf, 10);
+        const pixRGBT2 = RICROSSerial.extractRGBT(buf, 14);
+        const pixRGBT3 = RICROSSerial.extractRGBT(buf, 18);
+        const loopMsAvg = RICUtils.getBEUint8FromBuf(buf, 22);
+        const loopMsMax = RICUtils.getBEUint8FromBuf(buf, 23);
+        // RICLog.debug(`RobotStatus ${buf.length} ${RICUtils.bufferToHex(buf)} ${flags} ${workQCount} ${heapFree} ${heapMin} ${pixRGBT1.toString()} ${pixRGBT2.toString()} ${pixRGBT3.toString()} ${loopMsAvg} ${loopMsMax}`);
+        return {
+          robotStatus: {
+            flags: flags,
+            isMoving: (flags & 0x01) != 0,
+            isPaused: (flags & 0x02) != 0,
+            isFwUpdating: (flags & 0x04) != 0,
+            workQCount: workQCount,
+            heapFree: heapFree,
+            heapMin: heapMin,
+            pixRGBT: [pixRGBT1, pixRGBT2, pixRGBT3],
+            loopMsAvg: loopMsAvg,
+            loopMsMax: loopMsMax,
+          },
+        }
+    } else {
+        const flags = RICUtils.getBEUint8FromBuf(buf, 0);
+        const workQCount = RICUtils.getBEUint8FromBuf(buf, 1);
+        // RICLog.debug(`RobotStatus ${buf.length} ${RICUtils.bufferToHex(buf)} ${flags} ${workQCount}`);
+        return {
+          robotStatus: {
+            flags: flags,
+            isMoving: (flags & 0x01) != 0,
+            isPaused: (flags & 0x02) != 0,
+            isFwUpdating: (flags & 0x04) != 0,
+            workQCount: workQCount,
+            heapFree: 0,
+            heapMin: 0,
+            pixRGBT: [],
+            loopMsAvg: 0,
+            loopMsMax: 0,
+          }
+        }
+    };
   }
 }

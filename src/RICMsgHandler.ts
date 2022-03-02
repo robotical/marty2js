@@ -4,20 +4,22 @@
 // Communications Connector for RIC V2
 //
 // RIC V2
-// Rob Dobson & Chris Greening 2020
-// (C) Robotical 2020
+// Rob Dobson & Chris Greening 2020-2022
+// (C) Robotical 2020-2022
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import CommsStats from './CommsStats.js';
-import MsgTrackInfo from './RICMsgTrackInfo.js';
-import RICUtils from './RICUtils.js';
+import CommsStats from './CommsStats';
+import MsgTrackInfo from './RICMsgTrackInfo';
+import RICLog from './RICLog';
+import RICUtils from './RICUtils';
 import RICROSSerial, {
   ROSSerialIMU,
   ROSSerialSmartServos,
   ROSSerialPowerStatus,
   ROSSerialAddOnStatusList,
-} from './RICROSSerial.js';
+  ROSSerialRobotStatus,
+} from './RICROSSerial';
 import {
   PROTOCOL_RICREST,
   RICSERIAL_MSG_NUM_POS,
@@ -25,9 +27,10 @@ import {
   RICSERIAL_PROTOCOL_POS,
   RICREST_REST_ELEM_CODE_POS,
   RICREST_HEADER_PAYLOAD_POS,
-} from './RICProtocolDefs.js';
-import MiniHDLC from './MiniHDLC.js';
-import RICAddOnManager from './RICAddOnManager.js';
+} from './RICProtocolDefs';
+import MiniHDLC from './MiniHDLC';
+import RICAddOnManager from './RICAddOnManager';
+import { RICCommsChannelEnum } from './RICTypes';
 
 // Protocol enums
 export enum RICRESTElemCode {
@@ -47,7 +50,7 @@ export enum ProtocolMsgDirection {
 
 export enum ProtocolMsgProtocol {
   MSG_PROTOCOL_ROSSERIAL,
-  MSG_PROTOCOL_M1SC,
+  MSG_PROTOCOL_RESERVED_1,
   MSG_PROTOCOL_RICREST,
 }
 
@@ -70,16 +73,24 @@ export interface MessageResult {
   onRxIMU(imuData: ROSSerialIMU): void;
   onRxPowerStatus(powerStatus: ROSSerialPowerStatus): void;
   onRxAddOnPub(addOnInfo: ROSSerialAddOnStatusList): void;
+  onRobotStatus(robotStatus: ROSSerialRobotStatus): void;
+  onRxOtherROSSerialMsg(topicID: number, payload: Uint8Array): void;
 }
 
 export interface MessageSender {
-  sendTxMsg(msg: Uint8Array, sendWithResponse: boolean): Promise<void>;
-  sendTxMsgNoAwait(msg: Uint8Array, sendWithResponse: boolean): Promise<void>;
+  sendTxMsg(
+    msg: Uint8Array,
+    sendWithResponse: boolean,
+  ): Promise<void>;
+  sendTxMsgNoAwait(
+    msg: Uint8Array,
+    sendWithResponse: boolean,
+  ): Promise<boolean>;
 }
 
 // Message tracking
 const MAX_MSG_NUM = 255;
-const MSG_RESPONSE_TIMEOUT_MS = 500;
+const MSG_RESPONSE_TIMEOUT_MS = 5000;
 const MSG_RETRY_COUNT = 5;
 
 export default class RICMsgHandler {
@@ -92,6 +103,9 @@ export default class RICMsgHandler {
   _msgTrackCheckTimer: ReturnType<typeof setTimeout> | null = null;
   _msgTrackTimerEnabled = false;
   _msgTrackTimerMs = 100;
+
+  // report message callback dictionary. Add a callback to subscribe to report messages
+  _reportMsgCallbacks = new Map<string, (report:Object)=> void>();
 
   // Interface to inform of message results
   _msgResultHandler: MessageResult | null = null;
@@ -112,7 +126,7 @@ export default class RICMsgHandler {
   constructor(commsStats: CommsStats, addOnManager: RICAddOnManager) {
     this._commsStats = commsStats;
     this._addOnManager = addOnManager;
-    RICUtils.debug('RICMsgHandler constructor');
+    RICLog.debug('RICMsgHandler constructor');
 
     // Message tracking
     for (let i = 0; i < this._msgTrackInfos.length; i++) {
@@ -150,7 +164,7 @@ export default class RICMsgHandler {
 
   handleNewRxMsg(rxMsg: Uint8Array): void {
     this._miniHDLC.addRxBytes(rxMsg);
-    RICUtils.verbose(`HandleRxBytes len ${rxMsg.length} ${RICUtils.bufferToHex(rxMsg)}`)
+    // RICLog.verbose(`handleNewRxMsg len ${rxMsg.length} ${RICUtils.bufferToHex(rxMsg)}`)
   }
 
   _onHDLCFrameDecode(rxMsg: Uint8Array): void {
@@ -163,7 +177,7 @@ export default class RICMsgHandler {
       return;
     }
 
-    RICUtils.verbose(`handleNewRxMsg len ${rxMsg.length}`);
+    // RICLog.verbose(`_onHDLCFrameDecode len ${rxMsg.length}`);
 
     // Decode the RICFrame header
     const rxMsgNum = rxMsg[RICSERIAL_MSG_NUM_POS] & 0xff;
@@ -172,12 +186,12 @@ export default class RICMsgHandler {
 
     // Result of message
     let msgRsltCode = MessageResultCode.MESSAGE_RESULT_UNKNOWN;
-    let msgRsltJsonObj = { rslt: 'unknown' };
+    let msgRsltJsonObj = { rslt: 'unknown', timeReceived: 0 };
 
     // Decode payload
     if (rxProtocol == PROTOCOL_RICREST) {
-      RICUtils.verbose(
-        `handleNewRxMsg RICREST rx msgNum ${rxMsgNum} msgDirn ${rxDirn} ${RICUtils.bufferToHex(
+      RICLog.verbose(
+        `_onHDLCFrameDecode RICREST rx msgNum ${rxMsgNum} msgDirn ${rxDirn} ${RICUtils.bufferToHex(
           rxMsg,
         )}`,
       );
@@ -195,9 +209,9 @@ export default class RICMsgHandler {
           RICSERIAL_PAYLOAD_POS + RICREST_HEADER_PAYLOAD_POS,
           rxMsg.length - RICSERIAL_PAYLOAD_POS - RICREST_HEADER_PAYLOAD_POS - 1,
         );
-        // RICUtils.debug(
-        //   `handleNewRxMsg RICREST rx elemCode ${ricRestElemCode} ${restStr}`,
-        // );
+        RICLog.verbose(
+          `_onHDLCFrameDecode RICREST rx elemCode ${ricRestElemCode} ${restStr}`,
+        );
 
         // Convert JSON
         if (ricRestElemCode == RICRESTElemCode.RICREST_REST_ELEM_CMDRESPJSON) {
@@ -210,29 +224,29 @@ export default class RICMsgHandler {
               } else if (rsltStr === 'fail') {
                 msgRsltCode = MessageResultCode.MESSAGE_RESULT_FAIL;
               } else {
-                console.warn(
-                  `handleNewRxMsg RICREST rslt not recognized ${msgRsltJsonObj.rslt}`,
+                RICLog.warn(
+                  `_onHDLCFrameDecode RICREST rslt not recognized ${msgRsltJsonObj.rslt}`,
                 );
               }
-            } else {
-              console.warn(
-                `handleNewRxMsg RICREST doesn't contain rslt ${restStr}`,
+            } else if (rxDirn == ProtocolMsgDirection.MSG_DIRECTION_RESPONSE){
+              RICLog.warn(
+                `_onHDLCFrameDecode RICREST response doesn't contain rslt ${restStr}`,
               );
             }
           } catch (excp: unknown) {
             if (excp instanceof Error) {
-              console.warn(
-                `handleNewRxMsg Failed to parse JSON response ${excp.toString()}`,
+              RICLog.warn(
+                `_onHDLCFrameDecode Failed to parse JSON response ${excp.toString()}`,
               );
             }
           }
         }
       } else {
-        // const binMsgLen =
-        //   rxMsg.length - RICSERIAL_PAYLOAD_POS - RICREST_HEADER_PAYLOAD_POS;
-        // RICUtils.debug(
-        //   `handleNewRxMsg RICREST rx binary message elemCode ${ricRestElemCode} len ${binMsgLen}`,
-        // );
+        const binMsgLen =
+          rxMsg.length - RICSERIAL_PAYLOAD_POS - RICREST_HEADER_PAYLOAD_POS;
+        RICLog.verbose(
+          `_onHDLCFrameDecode RICREST rx binary message elemCode ${ricRestElemCode} len ${binMsgLen}`,
+        );
       }
     } else if (rxProtocol == ProtocolMsgProtocol.MSG_PROTOCOL_ROSSERIAL) {
       // Extract ROSSerial messages - decoded messages returned via _msgResultHandler
@@ -244,18 +258,22 @@ export default class RICMsgHandler {
         this._addOnManager,
       );
     } else {
-      RICUtils.warn(`handleNewRxMsg unsupported protocol ${rxProtocol}`);
+      RICLog.warn(`_onHDLCFrameDecode unsupported protocol ${rxProtocol}`);
     }
 
     // Handle matching of commands and responses
-    //        RICUtils.debug(`onMsgRx msgRsltCode ${msgRsltCode}`);
+    // RICLog.verbose(`_onHDLCFrameDecode msgRsltCode ${msgRsltCode}`);
     if (rxDirn == ProtocolMsgDirection.MSG_DIRECTION_RESPONSE) {
       this.msgTrackingRxRespMsg(rxMsgNum, msgRsltCode, msgRsltJsonObj);
+    } else if (rxDirn == ProtocolMsgDirection.MSG_DIRECTION_REPORT){
+      msgRsltJsonObj.timeReceived = Date.now();
+      RICLog.verbose(`_onHDLCFrameDecode ${JSON.stringify(msgRsltJsonObj)}`);
+      this._reportMsgCallbacks.forEach((callback) => callback(msgRsltJsonObj));
     }
   }
 
   async sendRICRESTURL<T>(
-    cmdStr: string, 
+    cmdStr: string,
     msgTracking: boolean,
     msgTimeoutMs: number | undefined = undefined,
   ): Promise<T> {
@@ -347,18 +365,24 @@ export default class RICMsgHandler {
         msgBuf.set(msgPayload, RICSERIAL_PAYLOAD_POS);
 
         // Debug
-        // RICUtils.debug(
-        //   `sendCommsMsg Message tx msgNum ${
-        //     isNumbered ? this._currentMsgNumber : 'unnumbered'
-        //   } data ${RICUtils.bufferToHex(msgBuf)}`,
-        // );
+        RICLog.verbose(
+          `sendCommsMsg Message tx msgNum ${
+            isNumbered ? this._currentMsgNumber : 'unnumbered'
+          } data ${RICUtils.bufferToHex(msgBuf)}`,
+        );
 
         // Wrap into HDLC
         const framedMsg = this._miniHDLC.encode(msgBuf);
 
         // Update message tracking
         if (isNumbered) {
-          this.msgTrackingTxCmdMsg<T>(framedMsg, withResponse, msgTimeoutMs, resolve, reject);
+          this.msgTrackingTxCmdMsg<T>(
+            framedMsg,
+            withResponse,
+            msgTimeoutMs,
+            resolve,
+            reject,
+          );
           this._currentMsgHandle++;
         }
 
@@ -369,15 +393,15 @@ export default class RICMsgHandler {
 
         // Return msg handle
         if (!isNumbered) {
-          (resolve as any)()
+          (resolve as any)();
         }
       } catch (error: any) {
         reject(error);
       }
     });
-    promise.catch((error: unknown) => { 
-      if (error instanceof Error) { 
-        RICUtils.warn(error.toString());
+    promise.catch((error: unknown) => {
+      if (error instanceof Error) {
+        RICLog.warn(`sendCommsMsg error ${error.toString()}`);
       }
     });
     return promise;
@@ -407,7 +431,7 @@ export default class RICMsgHandler {
     );
 
     // Debug
-    RICUtils.verbose(
+    RICLog.verbose(
       `msgTrackingTxCmdMsg msgNum ${
         this._currentMsgNumber
       } msg ${RICUtils.bufferToHex(msgFrame)} sanityCheck ${
@@ -439,19 +463,19 @@ export default class RICMsgHandler {
       return;
     }
     if (msgNum > MAX_MSG_NUM) {
-      RICUtils.debug('msgTrackingRxRespMsg msgNum > 255');
+      RICLog.warn('msgTrackingRxRespMsg msgNum > 255');
       return;
     }
     if (!this._msgTrackInfos[msgNum].msgOutstanding) {
-      RICUtils.debug(`msgTrackingRxRespMsg unmatched msgNum ${msgNum}`);
+      RICLog.warn(`msgTrackingRxRespMsg unmatched msgNum ${msgNum}`);
       this._commsStats.recordMsgNumUnmatched();
       return;
     }
 
     // Handle message
-    // RICUtils.debug(
-    //   `msgTrackingRxRespMsg Message response received msgNum ${msgNum}`,
-    // );
+    RICLog.verbose(
+      `msgTrackingRxRespMsg Message response received msgNum ${msgNum}`,
+    );
     this._commsStats.recordMsgResp(
       Date.now() - this._msgTrackInfos[msgNum].msgSentMs,
     );
@@ -497,9 +521,8 @@ export default class RICMsgHandler {
         Date.now() >
         this._msgTrackInfos[i].msgSentMs + msgTimeoutMs
       ) {
-        RICUtils.debug(
-          `msgTrackTimer Message response timeout msgNum ${i} retrying`,
-        );
+        RICLog.debug(`msgTrackTimer Message response timeout msgNum ${i} retrying`);
+        RICLog.verbose(`msgTrackTimer retryMsg ${RICUtils.bufferToHex(this._msgTrackInfos[i].msgFrame!)}`);        
         if (this._msgTrackInfos[i].retryCount < MSG_RETRY_COUNT) {
           this._msgTrackInfos[i].retryCount++;
           if (
@@ -512,13 +535,13 @@ export default class RICMsgHandler {
                 this._msgTrackInfos[i].withResponse,
               );
             } catch (error: any) {
-              RICUtils.warn('Retry message failed' + error.toString());
+              RICLog.warn(`Retry message failed ${error.toString()}`);
             }
           }
           this._commsStats.recordMsgRetry();
           this._msgTrackInfos[i].msgSentMs = Date.now();
         } else {
-          RICUtils.debug(
+          RICLog.warn(
             `msgTrackTimer TIMEOUT msgNum ${i} after ${MSG_RETRY_COUNT} retries`,
           );
           this._msgCompleted(i, MessageResultCode.MESSAGE_RESULT_TIMEOUT, null);

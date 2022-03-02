@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// RICConnUtils
+// RICUtils
 // Communications Connector for RIC V2
 //
 // RIC V2
@@ -9,13 +9,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { RICLogLevel, RICLogFn } from "./RICTypes.js";
+import RICLog from "./RICLog";
 
 export default class RICUtils {
   static _isEndianSet = false;
   static _isLittleEndian = false;
-  static _logListener: RICLogFn | null = null;
-  static _logLevel = RICLogLevel.INFO;
 
   /**
    *
@@ -32,7 +30,7 @@ export default class RICUtils {
   ): void {
     // Check valid
     if (buffer.length < startPos + strToAdd.length + 1) {
-      RICUtils.debug('addStringToBuffer buffer too short');
+      RICLog.error('addStringToBuffer buffer too short');
       return;
     }
     let curPos = startPos;
@@ -103,6 +101,19 @@ export default class RICUtils {
     return floatVal[0];
   }
 
+  /**
+   *
+   * Extract a big-endian uint16 from a uint8array
+   *
+   * @param buf - Uint8Array containing uint16
+   * @param pos - position (offset in buf) to get from
+   * @returns int16
+   */
+     static getBEUint32FromBuf(buf: Uint8Array, bufPos: number): number {
+      if (RICUtils.isLittleEndian()) return (buf[bufPos] << 24) + (buf[bufPos + 1] << 16) + (buf[bufPos + 2] << 8) + buf[bufPos + 3];
+      return (buf[bufPos + 3] << 24) + (buf[bufPos + 2] << 16) + (buf[bufPos + 1] << 8) + buf[bufPos];
+    }
+  
   /**
    *
    * Extract a big-endian int16 from a uint8array
@@ -361,58 +372,17 @@ export default class RICUtils {
   }
 
   static padStartFn(inStr: string, targetLength: number, padString: string): string {
-      targetLength = targetLength>>0; //truncate if number or convert non-number to 0;
-      padString = String((typeof padString !== 'undefined' ? padString : ' '));
-      if (inStr.length > targetLength) {
-        return String(inStr);
-      }
-      else {
-        targetLength = targetLength-inStr.length;
-        if (targetLength > padString.length) {
-          padString += padString.repeat(targetLength/padString.length); //append to original to ensure we are longer than needed
-        }
-        return padString.slice(0,targetLength) + String(inStr);
-      }
+    targetLength = targetLength>>0; //truncate if number or convert non-number to 0;
+    padString = String((typeof padString !== 'undefined' ? padString : ' '));
+    if (inStr.length > targetLength) {
+      return String(inStr);
     }
-
-  static debug(msg: string) {
-    if (!this.doLogging(RICLogLevel.DEBUG, msg))
-      console.debug(msg);
-  }
-
-  static info(msg: string) {
-    if (!this.doLogging(RICLogLevel.INFO, msg))
-      console.info(msg);
-  }
-
-  static warn(msg: string) {
-    if (!this.doLogging(RICLogLevel.WARN, msg))
-      console.warn(msg);
-  }
-
-  static error(msg: string) {
-    if (!this.doLogging(RICLogLevel.ERROR, msg))
-      console.error(msg);
-  }
-
-  static verbose(msg: string) {
-    if (!this.doLogging(RICLogLevel.VERBOSE, msg))
-      console.log(msg);
-  }
-
-  static setLogListener(listener: RICLogFn | null) {
-    this._logListener = listener;
-  }
-
-  static setLogLevel(logLevel: RICLogLevel): void {
-    this._logLevel = logLevel;
-  }
-
-  static doLogging(logLevel: RICLogLevel, msg: string): boolean {
-    if (this._logListener) {
-      this._logListener(logLevel, msg)
-      return true;
-    } 
-    return this._logLevel < logLevel;
-  }
+    else {
+      targetLength = targetLength-inStr.length;
+      if (targetLength > padString.length) {
+        padString += padString.repeat(targetLength/padString.length); //append to original to ensure we are longer than needed
+      }
+      return padString.slice(0,targetLength) + String(inStr);
+    }
+  }  
 }

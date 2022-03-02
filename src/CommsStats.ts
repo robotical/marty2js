@@ -30,6 +30,8 @@ export default class CommsStats {
   _msgIMU = 0;
   _msgPowerStatus = 0;
   _msgAddOnPub = 0;
+  _msgRobotStatus = 0;
+  _msgOtherTopic = 0;
 
   clear() {
     this._msgRxCount = 0;
@@ -52,6 +54,8 @@ export default class CommsStats {
     this._msgIMU = 0;
     this._msgPowerStatus = 0;
     this._msgAddOnPub = 0;
+    this._msgRobotStatus = 0;
+    this._msgOtherTopic = 0;
   }
 
   msgRx(): void {
@@ -147,6 +151,16 @@ export default class CommsStats {
 
   recordAddOnPub(): void {
     this._msgAddOnPub++;
+    this.msgRx();
+  }
+
+  recordRobotStatus(): void {
+    this._msgRobotStatus++;
+    this.msgRx();
+  }
+
+  recordOtherTopic(): void {
+    this._msgOtherTopic++;
     this.msgRx();
   }
 }

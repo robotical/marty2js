@@ -9,20 +9,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import RICUtils from "./RICUtils.js";
+import RICLog from "./RICLog"
 
 export class FileBlockTrackInfo {
   isDone = false;
-  prom: Promise<void>;
-  constructor(prom: Promise<void>) {
+  prom: Promise<boolean>;
+  constructor(prom: Promise<boolean>) {
     this.prom = prom;
     this.prom.then(
       () => {
-        // RICUtils.debug('send complete');
+        // RICLog.debug('send complete');
         this.isDone = true;
       },
       rej => {
-        RICUtils.debug('FileBlockTrackInfo send rejected ' + rej.toString());
+        RICLog.debug(`FileBlockTrackInfo send rejected ${rej}`);
         this.isDone = true;
       },
     );
